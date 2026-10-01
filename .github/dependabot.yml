@@ -1,15 +1,32 @@
+# Dependabot: PR-ы с обновлениями зависимостей. Мержим, только если CI зелёный.
+# Чтобы не тонуть в PR: всё группируется (один PR на группу), мажорные версии Maven игнорируются —
+# переход на новую мажорку (Spring Boot 5, Modulith 3 …) делаем осознанно отдельной задачей.
 version: 2
 updates:
   - package-ecosystem: maven
     directory: /
-    schedule: { interval: weekly }
-    open-pull-requests-limit: 5
+    schedule: { interval: weekly, day: monday }
     target-branch: develop
+    open-pull-requests-limit: 3
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      # Spring Boot parent + всё, что версионируется вместе с ним
+      spring:
+        patterns: ["org.springframework*"]
+      # остальное: ArchUnit, MapStruct, ShedLock, плагины сборки и т. п.
+      other-maven:
+        patterns: ["*"]
+        exclude-patterns: ["org.springframework*"]
 
   - package-ecosystem: github-actions
     directory: /
-    schedule: { interval: weekly }
+    schedule: { interval: monthly }
     target-branch: develop
+    groups:
+      actions:
+        patterns: ["*"]
 
   # PR при новом коммите в senso-contracts: обновление сабмодуля contracts/
   - package-ecosystem: gitsubmodule
