@@ -1,0 +1,143 @@
+@startuml
+title Identity Module — Proposed Class Structure
+
+skinparam packageStyle rectangle
+skinparam classAttributeIconSize 0
+
+package "identity" {
+
+    package "api" {
+
+        interface IdentityApi {
+            + getUser(userId)
+        }
+
+        class UserInfo <<DTO>> {
+            + id
+            + email
+            + displayName
+            + roles
+            + createdAt
+        }
+    }
+
+    package "internal" {
+
+        package "domain" {
+
+            class User <<Entity>> {
+                - id
+                - email
+                - displayName
+                - passwordHash
+                - roles
+                - createdAt
+            }
+
+            enum UserRole {
+                USER
+                ADMIN
+            }
+
+            class RefreshToken <<Entity>> {
+                - id
+                - userId
+                - tokenHash
+                - expiresAt
+                - revokedAt
+                - createdAt
+                + isExpired(now)
+                + isRevoked()
+                + revoke(now)
+            }
+        }
+
+        package "persistence" {
+
+            interface UserRepository {
+                + findByEmail(email)
+                + findById(id)
+                + existsByEmail(email)
+                + save(user)
+            }
+
+            interface RefreshTokenRepository {
+                + findByTokenHash(tokenHash)
+                + save(token)
+            }
+        }
+
+        package "service" {
+
+            class AuthService {
+                + register(email, displayName, password)
+                + login(email, password)
+                + logout(refreshToken)
+            }
+
+            class JwtService {
+                + createAccessToken(user)
+                + validateAccessToken(token)
+            }
+
+            class RefreshTokenService {
+                + create(user)
+                + rotate(token)
+                + revoke(token)
+            }
+        }
+
+        package "web" {
+
+            class AuthController {
+                + register(...)
+                + login(...)
+                + refresh(...)
+                + logout(...)
+            }
+
+            class UserController {
+                + getCurrentUser(...)
+            }
+        }
+    }
+}
+
+
+User --> UserRole
+
+RefreshToken "0..*" --> "1" User : belongs to
+
+AuthController --> AuthService
+AuthController --> RefreshTokenService
+
+UserController --> IdentityApi
+
+AuthService --> UserRepository
+AuthService --> JwtService
+AuthService --> RefreshTokenService
+
+RefreshTokenService --> RefreshTokenRepository
+RefreshTokenService --> UserRepository
+RefreshTokenService --> JwtService
+RefreshTokenService ..> RefreshToken : creates / rotates / revokes
+
+UserRepository ..> User : persists
+RefreshTokenRepository ..> RefreshToken : persists
+
+IdentityApi ..> UserInfo
+
+note right of IdentityApi
+Public module API.
+
+Other core modules may depend
+only on this package.
+end note
+
+note bottom of AuthService
+Application/service package placement
+may be adjusted after the core skeleton
+is finalized.
+end note
+
+@enduml

@@ -1,0 +1,59 @@
+@startuml
+title Identity — Login
+
+autonumber
+
+actor User
+participant "Frontend" as FE
+participant "AuthController" as Controller
+participant "AuthService" as Auth
+participant "UserRepository" as UserRepo
+participant "PasswordEncoder\n(BCrypt)" as BCrypt
+participant "JwtService" as Jwt
+participant "RefreshTokenService" as Refresh
+database "identity DB" as DB
+
+User -> FE : Enter email + password
+FE -> Controller : POST /login\nemail, password
+
+Controller -> Auth : login(email, password)
+
+Auth -> UserRepo : findByEmail(email)
+UserRepo -> DB : SELECT user
+DB --> UserRepo : user / not found
+UserRepo --> Auth : user / not found
+
+alt user exists
+    Auth -> BCrypt : matches(rawPassword, passwordHash)
+    BCrypt --> Auth : true / false
+
+    alt password valid
+        Auth -> Jwt : createAccessToken(user)
+        Jwt --> Auth : access JWT
+
+        Auth -> Refresh : create(user)
+        Refresh -> DB : save refresh session/token
+        DB --> Refresh : saved
+        Refresh --> Auth : refresh token
+
+        Auth --> Controller : authentication successful
+        Controller --> FE : 200 OK\naccess JWT\nSet-Cookie: refresh
+    else password invalid
+        Auth --> Controller : authentication failed
+        Controller --> FE : 401 Unauthorized\nGeneric credentials error
+    end
+
+else user does not exist
+    Auth --> Controller : authentication failed
+    Controller --> FE : 401 Unauthorized\nGeneric credentials error
+end
+
+note right of Controller
+The external response must not reveal
+whether the account exists.
+
+Invalid email and invalid password
+produce the same authentication error.
+end note
+
+@enduml
