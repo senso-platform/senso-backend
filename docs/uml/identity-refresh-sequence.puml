@@ -1,0 +1,59 @@
+@startuml
+title Identity — Refresh Token Rotation
+
+autonumber
+
+actor User
+participant "Frontend" as FE
+participant "AuthController" as Controller
+participant "RefreshTokenService" as Refresh
+participant "JwtService" as Jwt
+participant "UserRepository" as UserRepo
+database "identity DB" as DB
+
+User -> FE : Continue working with expired access token
+
+FE -> Controller : POST /refresh\nrefresh cookie
+
+Controller -> Refresh : rotate(refreshToken)
+
+Refresh -> DB : find refresh token/session
+DB --> Refresh : token / not found
+
+alt token exists and is valid
+
+    Refresh -> DB : invalidate old refresh token
+    DB --> Refresh : invalidated
+
+    Refresh -> UserRepo : find user
+    UserRepo -> DB : SELECT user
+    DB --> UserRepo : user
+    UserRepo --> Refresh : user
+
+    Refresh -> Jwt : createAccessToken(user)
+    Jwt --> Refresh : new access JWT
+
+    Refresh -> Refresh : generate new refresh token
+    Refresh -> DB : save new refresh token
+    DB --> Refresh : saved
+
+    Refresh --> Controller : access JWT + new refresh token
+
+    Controller --> FE : 200 OK\nnew access JWT\nSet-Cookie: new refresh
+
+else token expired / revoked / invalid
+    Refresh --> Controller : refresh rejected
+    Controller --> FE : 401 Unauthorized\nClear refresh cookie
+end
+
+note right of Refresh
+Rotation rule:
+
+old refresh token -> invalid
+new refresh token -> active
+
+A previously used refresh token
+must not remain valid.
+end note
+
+@enduml
