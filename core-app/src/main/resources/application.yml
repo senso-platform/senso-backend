@@ -1,0 +1,52 @@
+spring:
+  application.name: senso-core
+  threads.virtual.enabled: true
+  datasource:
+    # SENSO_DB_URL обязан начинаться с "jdbc:" — иначе Hikari роняет старт со «'url' must start with "jdbc"».
+    # Значение по умолчанию намеренно нет: api/worker должны получать URL извне (см. deploy/.env.example).
+    url: ${SENSO_DB_URL}
+    username: ${SENSO_DB_USER}
+    password: ${SENSO_DB_PASSWORD}
+  flyway:
+    enabled: true
+    # история миграций — в платформенной схеме (первая в schemas)
+    locations:
+      - classpath:db/migration/platform
+      - classpath:db/migration/identity
+      - classpath:db/migration/devices
+      - classpath:db/migration/telemetry
+      - classpath:db/migration/alerts
+    schemas: platform,identity,devices,telemetry,alerts
+    create-schemas: true
+    # Версии-таймстампы из разных веток вливаются не по порядку: миграция Юли V…1005 может попасть в develop
+    # после V…1006. Без out-of-order уже мигрированная БД (локальная, dev-стенд) падает на validate.
+    out-of-order: true
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  rabbitmq:
+    host: ${SENSO_RABBIT_HOST}
+    port: ${SENSO_RABBIT_AMQP_PORT:5672}
+    username: ${SENSO_RABBIT_USER}
+    password: ${SENSO_RABBIT_PASSWORD}
+    virtual-host: senso
+  modulith:
+    events:
+      jdbc:
+        schema: platform
+        schema-initialization:
+          enabled: false   # таблицу event_publication создаёт Flyway
+      # Завершённые публикации удаляются, иначе platform.event_publication растёт бесконечно.
+      # Незавершённые (ошибка листенера/брокера) остаются и переотправляются.
+      completion-mode: delete
+management:
+  endpoints:
+    web:
+      exposure:
+        # modulith (структура модулей) — только в local: на api-порту это публичная информация о внутренностях.
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true

@@ -18,6 +18,11 @@ public record PageRequestParams(int limit, String cursor) {
         return new PageRequestParams(limit == null ? DEFAULT_LIMIT : limit, cursor);
     }
 
+    /** Сколько строк читать из БД: на одну больше лимита, см. {@link CursorPage#of}. */
+    public int fetchSize() {
+        return limit + 1;
+    }
+
     public Cursor decodeCursor() {
         return cursor == null || cursor.isBlank() ? null : Cursor.decode(cursor);
     }

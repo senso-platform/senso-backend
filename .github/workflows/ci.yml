@@ -1,0 +1,60 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [develop, main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # verify = компиляция, unit (surefire), интеграционные с Testcontainers (failsafe),
+      # ArchitectureTest, Spotless check. Docker на ubuntu-runner есть из коробки.
+      # mvnw закоммичен с Windows без бита исполнения. Правильный фикс: git update-index --chmod=+x mvnw
+      - name: Build and test
+        run: |
+          chmod +x mvnw
+          ./mvnw -B -ntp verify
+
+      - name: Test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            **/target/surefire-reports/
+            **/target/failsafe-reports/
+            **/target/site/jacoco/
+          retention-days: 7
+
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install "jsonschema[format]"
+      - name: Validate MQTT examples from the pinned contracts commit
+        run: python contracts/scripts/validate_examples.py

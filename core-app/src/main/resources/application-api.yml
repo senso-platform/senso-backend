@@ -1,0 +1,8 @@
+# api-роль: REST, SSE, миграции Flyway (общие настройки — в application.yml).
+#
+# AMQP-листенеры здесь не выключаются глобально: бины роли worker (@WorkerRole) в этом профиле просто не создаются.
+# Листенер realtime (анонимная очередь на senso.notifications) помечен @ApiRole и стартует как обычно.
+logging:
+  structured:
+    format:
+      console: logstash   # JSON-логи (ADR-0001 §12.2); в local остаётся человекочитаемый формат

@@ -1,0 +1,10 @@
+# worker-роль: миграции не применяет (это делает api), HTTP-порт отдельный — только actuator.
+server:
+  port: 8081
+spring:
+  flyway:
+    enabled: false
+logging:
+  structured:
+    format:
+      console: logstash   # JSON-логи (ADR-0001 §12.2); в local остаётся человекочитаемый формат

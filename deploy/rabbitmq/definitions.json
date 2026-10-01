@@ -1,0 +1,88 @@
+{
+  "users": [
+    {
+      "name": "senso-admin",
+      "password_hash": "cET0KS07fsY/9XXwJnKOU14ofWpqqbhyFfaypxIlIfOS4uoo",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": ["administrator"]
+    },
+    {
+      "name": "senso-core",
+      "password_hash": "4WxTYqpLJlUDys1BpOdVhWUNBvIb5AuYw3qyiO9gqwH2upqN",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": []
+    },
+    {
+      "name": "senso-ingest",
+      "password_hash": "r8TG1xhY6wvKOd2+uNBFBxkeSb/DBsTJOJjxMnVozJykowkx",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": []
+    },
+    {
+      "name": "gw-emulator-01",
+      "password_hash": "aggF3Z0hs8kEXWE9Bg49eU0bvUdCcchoj12JFKDuFe5xtz1T",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": []
+    }
+  ],
+  "vhosts": [{ "name": "senso" }],
+  "permissions": [
+    { "user": "senso-admin",  "vhost": "senso", "configure": ".*", "write": ".*", "read": ".*" },
+    { "user": "senso-core",   "vhost": "senso", "configure": ".*", "write": ".*", "read": ".*" },
+    { "user": "senso-ingest", "vhost": "senso", "configure": ".*", "write": ".*", "read": ".*" },
+    {
+      "user": "gw-emulator-01",
+      "vhost": "senso",
+      "configure": "^mqtt-.*",
+      "write": "^(amq\\.topic|mqtt-.*)$",
+      "read": "^(amq\\.topic|mqtt-.*)$"
+    }
+  ],
+  "topic_permissions": [
+    {
+      "user": "gw-emulator-01",
+      "vhost": "senso",
+      "exchange": "amq.topic",
+      "write": "^senso\\.v1\\.gw\\.gw-emulator-01\\.(telemetry|events|status|ack)$",
+      "read": "^senso\\.v1\\.gw\\.gw-emulator-01\\.cmd$"
+    }
+  ],
+  "exchanges": [
+    { "name": "senso.validated",     "vhost": "senso", "type": "topic",  "durable": true, "auto_delete": false, "internal": false, "arguments": {} },
+    { "name": "senso.notifications", "vhost": "senso", "type": "fanout", "durable": true, "auto_delete": false, "internal": false, "arguments": {} },
+    { "name": "senso.live",          "vhost": "senso", "type": "topic",  "durable": true, "auto_delete": false, "internal": false, "arguments": {} },
+    { "name": "senso.dlq",           "vhost": "senso", "type": "direct", "durable": true, "auto_delete": false, "internal": false, "arguments": {} }
+  ],
+  "queues": [
+    {
+      "name": "q.ingest.raw",
+      "vhost": "senso",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum",
+        "x-dead-letter-exchange": "senso.dlq",
+        "x-dead-letter-routing-key": "failed"
+      }
+    },
+    {
+      "name": "q.dlq.invalid",
+      "vhost": "senso",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": { "x-queue-type": "quorum" }
+    },
+    {
+      "name": "q.dlq.failed",
+      "vhost": "senso",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": { "x-queue-type": "quorum" }
+    }
+  ],
+  "bindings": [
+    { "source": "amq.topic", "vhost": "senso", "destination": "q.ingest.raw",  "destination_type": "queue", "routing_key": "senso.v1.gw.*.*", "arguments": {} },
+    { "source": "senso.dlq", "vhost": "senso", "destination": "q.dlq.invalid", "destination_type": "queue", "routing_key": "invalid",         "arguments": {} },
+    { "source": "senso.dlq", "vhost": "senso", "destination": "q.dlq.failed",  "destination_type": "queue", "routing_key": "failed",          "arguments": {} }
+  ]
+}

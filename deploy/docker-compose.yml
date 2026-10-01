@@ -1,0 +1,81 @@
+# Локальная инфраструктура SensoBazaar.
+#   docker compose -f deploy/docker-compose.yml up -d                     # postgres + rabbitmq
+#   docker compose -f deploy/docker-compose.yml --profile app up -d       # + core-api, core-worker, ingest   (TODO)
+#   docker compose -f deploy/docker-compose.yml --profile emulator up -d  # + эмулятор шлюза                  (TODO)
+#
+# Перед первым запуском: cp deploy/.env.example deploy/.env
+# Порты публикуются только на 127.0.0.1.
+
+name: senso
+
+services:
+  postgres:
+    image: timescale/timescaledb:2.30.2-pg16
+    environment:
+      POSTGRES_DB: ${SENSO_DB_NAME:-senso}
+      POSTGRES_USER: ${SENSO_DB_USER:-senso}
+      POSTGRES_PASSWORD: ${SENSO_DB_PASSWORD:?set SENSO_DB_PASSWORD in deploy/.env}
+      # timescaledb-tune подстраивает конфиг под память контейнера, а не хоста.
+      TS_TUNE_MEMORY: 512MB
+      TS_TUNE_NUM_CPUS: "2"
+    ports:
+      - "127.0.0.1:${SENSO_DB_PORT:-5432}:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 512m
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:4.3.6-management
+    hostname: senso-rabbit          # имя ноды фиксировано, иначе volume с данными «теряется» при пересоздании
+    ports:
+      - "127.0.0.1:${SENSO_RABBIT_AMQP_PORT:-5672}:5672"     # AMQP (core, ingest)
+      - "127.0.0.1:${SENSO_RABBIT_UI_PORT:-15672}:15672"     # management UI
+      - "127.0.0.1:${SENSO_MQTT_PORT:-1883}:1883"            # MQTT без TLS, только локально
+    volumes:
+      - rabbit-data:/var/lib/rabbitmq
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+      - ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+    mem_limit: 512m
+    restart: unless-stopped
+
+  # --- profile: app ------------------------------------------------------------------------
+  # TODO (S1, после Dockerfile-ов): core-api, core-worker, ingest.
+  # core-api:
+  #   build: { context: .., dockerfile: core-app/Dockerfile }
+  #   profiles: [app]
+  #   environment:
+  #     SPRING_PROFILES_ACTIVE: api
+  #     SENSO_DB_URL: jdbc:postgresql://postgres:5432/${SENSO_DB_NAME:-senso}
+  #     SENSO_DB_USER: ${SENSO_DB_USER:-senso}
+  #     SENSO_DB_PASSWORD: ${SENSO_DB_PASSWORD}
+  #     SENSO_RABBIT_HOST: rabbitmq
+  #     SENSO_RABBIT_USER: ${SENSO_RABBIT_CORE_USER}
+  #     SENSO_RABBIT_PASSWORD: ${SENSO_RABBIT_CORE_PASSWORD}
+  #   ports: ["127.0.0.1:8080:8080"]
+  #   depends_on:
+  #     postgres: { condition: service_healthy }
+  #     rabbitmq: { condition: service_healthy }
+  #   healthcheck: ... /actuator/health/readiness
+  # core-worker: тот же образ, SPRING_PROFILES_ACTIVE=worker, depends_on core-api: service_healthy (миграции)
+  # ingest:      build ingest-app, depends_on rabbitmq: service_healthy
+
+  # --- profile: emulator -------------------------------------------------------------------
+  # TODO: эмулятор шлюза (tools/emulator), подключение к rabbitmq:1883 под gw-emulator-01.
+
+volumes:
+  pg-data:
+  rabbit-data:

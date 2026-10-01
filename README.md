@@ -84,12 +84,15 @@ flowchart LR
 
 ## Быстрый старт
 
+> Первый раз в проекте — иди по пошаговому чек-листу [`docs/dev/ONBOARDING.md`](docs/dev/ONBOARDING.md):
+> там проверки после каждого шага и настройка IDEA. Ниже — краткая версия.
+
 ### Требования
 
 - JDK 21 (Temurin)
 - Docker Desktop / Docker Engine с Compose v2
 - Git
-- Python 3.12 (только для эмулятора)
+- Python 3.12 (только для эмулятора, появится в S1–S2)
 - 8 ГБ RAM свободно для полного стека
 
 ### 1. Клонировать вместе с контрактами
@@ -114,6 +117,11 @@ docker compose -f deploy/docker-compose.yml up -d          # PostgreSQL + Timesc
 | RabbitMQ management | http://localhost:15672 | из `deploy/.env` |
 | MQTT (без TLS, только локально) | `localhost:1883` | `gw-emulator-01` / из `deploy/.env` |
 
+Порты в репозитории — дефолтные (5432/5672/15672/1883) и одинаковы во всех файлах; фактические порты на машине
+задаются в `deploy/.env` (`SENSO_DB_PORT` и т. п.), который в `.gitignore`. Если 5432 занят своей службой
+PostgreSQL, подними контейнер на свободном порту и передай тот же URL приложению через переменную окружения
+`SENSO_DB_URL` — подробнее в `deploy/README.md`.
+
 ### 3. Запустить приложения из IDE или консоли
 
 Локально удобнее запускать `core` сразу в обеих ролях (профиль `local` включает `api` и `worker`):
@@ -127,7 +135,7 @@ docker compose -f deploy/docker-compose.yml up -d          # PostgreSQL + Timesc
 
 API: http://localhost:8080/api/v1, health: http://localhost:8080/actuator/health.
 
-### 4. Или всё в контейнерах
+### 4. Или всё в контейнерах (появится вместе с Dockerfile-ами, пока не работает)
 
 ```bash
 docker compose -f deploy/docker-compose.yml --profile app up -d --build
@@ -142,7 +150,9 @@ docker compose -f deploy/docker-compose.yml --profile app up -d --build
 | `emulator` | эмулятор шлюза |
 | `obs` | Prometheus, Grafana (с S5) |
 
-### 5. Отправить данные эмулятором
+### 5. Отправить данные эмулятором (эмулятор `tools/emulator` в разработке)
+
+Пока эмулятора нет, сообщение шлюза можно отправить `mosquitto_pub` — см. `deploy/README.md`.
 
 ```bash
 cd tools/emulator
@@ -247,11 +257,11 @@ git add contracts && git commit -m "chore(contracts): bump to <tag>"
 
 | Уровень | Где | Команда |
 | --- | --- | --- |
-| Unit | `src/test/java/**/*Test.java` | `./mvnw test` |
+| Unit | `src/test/java/**/*Test.java` (`*Tests.java` тоже запускается) | `./mvnw test` |
 | Интеграционные (Testcontainers) | `src/test/java/**/*IT.java` | `./mvnw verify` |
 | Архитектура | `core-app/src/test/java/dev/senso/core/ArchitectureTest.java` | входит в `verify` |
 | Контракты | `ContractExamplesTest`, проверка OpenAPI | входит в `verify` |
-| Сквозной скелет | `WalkingSkeletonIT` (брокер → ingest → worker → БД) | входит в `verify` |
+| Сквозной скелет | `WalkingSkeletonIT` (брокер → ingest → worker → БД) — появится в S1/S2 | входит в `verify` |
 
 Интеграционные тесты поднимают `timescale/timescaledb` и `rabbitmq` в контейнерах. Нужен запущенный Docker.
 
@@ -272,6 +282,8 @@ git add contracts && git commit -m "chore(contracts): bump to <tag>"
 | Симптом | Причина и решение |
 | --- | --- |
 | Тесты падают с `Could not find a valid Docker environment` | Docker не запущен или нет доступа к сокету |
+| `core-app needs a role profile: api, worker or local` | Запуск без профиля. Локально — `-Dspring-boot.run.profiles=local` |
+| Остальные грабли версий (Boot 4, Modulith, Testcontainers 2, Timescale, RabbitMQ) | [`docs/dev/TROUBLESHOOTING.md`](docs/dev/TROUBLESHOOTING.md) |
 | `contracts/` пустая папка | Не подтянут сабмодуль: `git submodule update --init --recursive` |
 | Flyway: `cannot create continuous aggregate … inside a transaction block` | В заголовке миграции нужен `-- flyway:executeInTransaction=false`, либо вынести агрегат в `R__`/отдельный файл без транзакции |
 | Эмулятор подключился, но в БД пусто | Устройство в статусе `PENDING` (телеметрия не сохраняется до подтверждения) или сообщение ушло в DLQ, смотрите `q.dlq.invalid` |
