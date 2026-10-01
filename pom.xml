@@ -37,7 +37,7 @@
     <java-uuid-generator.version>5.2.0</java-uuid-generator.version>
     <spotless.version>3.10.3</spotless.version>
     <palantir-java-format.version>2.99.0</palantir-java-format.version>
-    <jacoco.version>0.8.13</jacoco.version>
+    <jacoco.version>0.8.15</jacoco.version>
     <!--
       spring-boot:run пропускается во всех модулях, кроме приложений (там false). Тогда работает
       ./mvnw -pl core-app -am spring-boot:run: с -am goal не падает на aggregator-pom и библиотеках.
