@@ -1,11 +1,10 @@
 package dev.senso.core.identity.internal.domain;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -15,7 +14,12 @@ public class User {
     @Id
     private UUID id;
 
-    @Column(nullable = false, unique = true)
+    @Column(
+        name = "email",
+        nullable = false,
+        unique = true,
+        columnDefinition = "citext"
+    )
     private String email;
 
     @Column(name = "display_name", nullable = false, length = 128)
@@ -24,6 +28,7 @@ public class User {
     @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
     private UserStatus status;
 
@@ -32,6 +37,16 @@ public class User {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(
+        name = "user_roles",
+        schema = "identity",
+        joinColumns = @JoinColumn(name = "user_id")
+    )
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false, length = 32)
+    private Set<UserRole> roles = new HashSet<>();
 
     protected User() {
     }
@@ -43,7 +58,8 @@ public class User {
         String passwordHash,
         UserStatus status,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        Set<UserRole> roles
     ) {
         this.id = id;
         this.email = email;
@@ -52,5 +68,6 @@ public class User {
         this.status = status;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+        this.roles = roles;
     }
 }
