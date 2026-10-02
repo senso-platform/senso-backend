@@ -37,7 +37,12 @@
     <java-uuid-generator.version>5.2.0</java-uuid-generator.version>
     <spotless.version>3.10.3</spotless.version>
     <palantir-java-format.version>2.99.0</palantir-java-format.version>
-    <jacoco.version>0.8.13</jacoco.version>
+    <jacoco.version>0.8.15</jacoco.version>
+    <!--
+      spring-boot:run пропускается во всех модулях, кроме приложений (там false). Тогда работает
+      ./mvnw -pl core-app -am spring-boot:run: с -am goal не падает на aggregator-pom и библиотеках.
+    -->
+    <spring-boot.run.skip>true</spring-boot.run.skip>
   </properties>
 
   <dependencyManagement>
@@ -113,6 +118,10 @@
           <configuration>
             <release>${java.version}</release>
             <parameters>true</parameters>
+            <compilerArgs>
+              <!-- AGENTS.md §4: мапперы MapStruct — Spring-бины без явного componentModel в каждом маппере -->
+              <arg>-Amapstruct.defaultComponentModel=spring</arg>
+            </compilerArgs>
             <annotationProcessorPaths>
               <path>
                 <groupId>org.mapstruct</groupId>
@@ -126,15 +135,10 @@
           </configuration>
         </plugin>
 
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-surefire-plugin</artifactId>
-          <configuration>
-            <includes>
-              <include>**/*Test.java</include>
-            </includes>
-          </configuration>
-        </plugin>
+        <!--
+          surefire: оставлены дефолтные includes (Test*, *Test, *Tests, *TestCase). Явный список **/*Test.java
+          молча пропускал классы вида ModularityTests. *IT.java запускает failsafe.
+        -->
 
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -230,6 +234,18 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
       </plugin>
     </plugins>
   </build>

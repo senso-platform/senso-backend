@@ -12,5 +12,121 @@
 
   <artifactId>ingest-app</artifactId>
   <name>ingest-app</name>
-  <description>Ingest service: validation, normalisation, DLQ. Contents added in INIT-PLAN phase 6.</description>
+  <properties>
+    <!-- приложение: spring-boot:run разрешён (в parent он выключен для библиотек и aggregator-pom) -->
+    <spring-boot.run.skip>false</spring-boot.run.skip>
+  </properties>
+
+  <description>Приём трафика шлюзов: MQTT-очередь, валидация по контрактам, разметка в senso.validated / DLQ.
+    К БД не подключается и от core не зависит (AGENTS.md §3.8).</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>dev.senso</groupId>
+      <artifactId>platform-kernel</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>dev.senso</groupId>
+      <artifactId>messaging-contracts</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-amqp</artifactId>
+    </dependency>
+    <!-- web нужен только для actuator -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webmvc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-registry-prometheus</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>com.networknt</groupId>
+      <artifactId>json-schema-validator</artifactId>
+    </dependency>
+
+    <!-- tests -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.awaitility</groupId>
+      <artifactId>awaitility</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers-junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers-rabbitmq</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+
+      <!-- Контракты в classpath: схемы для валидатора, примеры для тестов (AGENTS.md §7: код под контракт) -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-resources-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>copy-mqtt-schemas</id>
+            <phase>process-resources</phase>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.outputDirectory}/schemas/mqtt</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>${project.basedir}/../contracts/mqtt</directory>
+                  <includes>
+                    <include>**/*.schema.json</include>
+                  </includes>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+          <execution>
+            <id>copy-mqtt-examples</id>
+            <phase>process-test-resources</phase>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.testOutputDirectory}/contracts/mqtt</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>${project.basedir}/../contracts/mqtt</directory>
+                  <includes>
+                    <include>examples/**/*.json</include>
+                  </includes>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 </project>

@@ -165,9 +165,9 @@ flowchart TB
 | Модуль | Ответственность | Владеет схемой | Публичное API (`..api`) | Публикует события | Потребляет | Владелец         |
 | --- | --- | --- | --- | --- | --- |------------------|
 | `identity` | Регистрация, вход, JWT, refresh-ротация, роли, пользователи | `identity` | `CurrentUser`, `UserLookup` | `UserRegistered` | нет | Java Developer A |
-| `devices` | Шлюзы, устройства, enrollment, жизненный цикл, связность (online/offline), авторизация MQTT | `devices` | `DeviceQueries` (`resolve`, `accessibleDeviceIds`, `find`), `GatewayAuthApi` | `DeviceApproved`, `DeviceChanged`, `GatewayStatusChanged` | `device.discovered.v1`, `gateway.status.v1` | Junior A         |
+| `devices` | Шлюзы, устройства, enrollment, жизненный цикл, связность (online/offline), авторизация MQTT | `devices` | `DeviceQueries` (`resolve`, `accessibleDeviceIds`, `find`), `GatewayAuthApi` | `DeviceApproved`, `DeviceChanged`, `GatewayStatusChanged` | `device.discovered.v1`, `gateway.status.v1` | Java Developer A |
 | `telemetry` | Запись и чтение измерений, агрегаты, экспорт живых значений | `telemetry` | `MeasurementQueries` | `senso.live` (в брокер) | `telemetry.v1` | Java Tech Lead   |
-| `alerts` | Приём `SECURITY_EVENT`, дедупликация, жизненный цикл алерта, история, счётчики | `alerts` | `AlertQueries`, `AlertCommands` | `AlertRaised`, `AlertStateChanged` | `security.event.v1`, `GatewayStatusChanged` | Junior B         |
+| `alerts` | Приём `SECURITY_EVENT`, дедупликация, жизненный цикл алерта, история, счётчики | `alerts` | `AlertQueries`, `AlertCommands` | `AlertRaised`, `AlertStateChanged` | `security.event.v1`, `GatewayStatusChanged` | Java Developer B |
 | `realtime` | SSE-эндпоинт, реестр подписок, фильтрация по владельцу | нет (без БД) | нет | нет | `senso.notifications`, `senso.live` | Java Developer B |
 | `platform-kernel` | Минимум общего: идентификаторы, Problem Details, время, интерфейс контекста безопасности | нет | да | нет | нет | Java Tech Lead   |
 

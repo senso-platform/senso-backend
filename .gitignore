@@ -16,6 +16,9 @@ buildNumber.properties
 .vscode/
 .qoder/
 
+# Локальные рабочие заметки агентов(разборы, хэндоффы) — не для репозитория
+docs/bootstrap/HANDOFF-*.md
+
 # Local infra config & secrets
 deploy/.env
 *.pem
@@ -33,4 +36,3 @@ __pycache__/
 # JDT-specific (Eclipse Java Development Tools)
 .classpath
 
-AGENTS.md

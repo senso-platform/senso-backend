@@ -1,0 +1,26 @@
+# local = api + worker в одном процессе (аннотации @ApiRole/@WorkerRole включают профиль local).
+# Значения по умолчанию соответствуют deploy/docker-compose.yml и deploy/.env.example.
+spring:
+  datasource:
+    # Порт/URL канонически совпадают с deploy/docker-compose.yml и deploy/.env.example. Если на хосте 5432
+    # уже занят (своя служба PostgreSQL перекрывает опубликованный порт контейнера) — не правь это значение,
+    # а переопредели окружение запуска: SENSO_DB_URL=jdbc:postgresql://localhost:<порт>/senso и SENSO_DB_PORT=<порт>
+    # в deploy/.env (deploy/.env приложение не читает, его видит только docker compose).
+    # Дефолт срабатывает, только если SENSO_DB_URL вовсе не задан: пустое значение или значение без "jdbc:"
+    # перекрывает его и роняет старт («'url' must start with "jdbc"»).
+    url: ${SENSO_DB_URL:jdbc:postgresql://localhost:5433/senso}
+    username: ${SENSO_DB_USER:senso}
+    password: ${SENSO_DB_PASSWORD:senso-dev-pass}
+  rabbitmq:
+    host: ${SENSO_RABBIT_HOST:localhost}
+    port: ${SENSO_RABBIT_AMQP_PORT:5672}
+    username: ${SENSO_RABBIT_USER:senso-core}
+    password: ${SENSO_RABBIT_PASSWORD:core-dev-pass}
+logging:
+  level:
+    dev.senso: DEBUG
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,modulith
