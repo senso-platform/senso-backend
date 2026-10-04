@@ -70,4 +70,36 @@ public class User {
         this.updatedAt = updatedAt;
         this.roles = roles;
     }
+
+    public UUID getId() {
+        return id;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
+    public UserStatus getStatus() {
+        return status;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public Set<UserRole> getRoles() {
+        return roles;
+    }
 }
