@@ -33,7 +33,7 @@
     <shedlock.version>7.10.1</shedlock.version>
     <archunit.version>1.5.1</archunit.version>
     <openapi-generator.version>7.25.0</openapi-generator.version>
-    <json-schema-validator.version>3.0.7</json-schema-validator.version>
+    <json-schema-validator.version>3.0.8</json-schema-validator.version>
     <java-uuid-generator.version>5.2.0</java-uuid-generator.version>
     <spotless.version>3.10.3</spotless.version>
     <palantir-java-format.version>2.99.0</palantir-java-format.version>
