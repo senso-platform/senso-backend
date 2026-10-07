@@ -1,0 +1,52 @@
+@startuml
+
+title identity — Registration (current implementation)
+
+autonumber
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam sequenceMessageAlign center
+
+actor User
+participant "Frontend" as FE
+participant "AuthController" as Controller
+participant "RegistrationService" as Registration
+participant "UserRepository" as UserRepo
+participant "PasswordService" as Password
+participant "Ids" as Ids
+participant "Clock" as Clock
+database "PostgreSQL\nidentity schema" as DB
+
+User -> FE : email + displayName + password
+FE -> Controller : POST /api/v1/auth/register\nRegisterRequest
+Controller -> Registration : register(email, displayName, password)
+
+Registration -> UserRepo : existsByEmail(email)
+UserRepo -> DB : SELECT exists
+DB --> UserRepo : true / false
+UserRepo --> Registration : true / false
+
+alt email is free
+    Registration -> Clock : instant()
+    Clock --> Registration : now
+    Registration -> Password : hash(rawPassword)
+    Password --> Registration : BCrypt hash
+    Registration -> Ids : newId()
+    Ids --> Registration : UUID
+
+    Registration -> Registration : create User\nstatus=ACTIVE, role=USER
+    Registration -> UserRepo : save(user)
+    UserRepo -> DB : INSERT users\nINSERT user_roles
+    DB --> UserRepo : saved user
+    UserRepo --> Registration : User
+    Registration --> Controller : User
+
+    Controller -> Controller : map User -> UserDto
+    Controller --> FE : 201 Created\nUserDto
+else email already exists
+    Registration --> Controller : IllegalStateException
+    Controller --> FE : error response
+end
+
+@enduml

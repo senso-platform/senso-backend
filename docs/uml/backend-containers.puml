@@ -1,0 +1,60 @@
+@startuml
+!pragma layout smetana
+
+title SensoBazaar Backend — Container View
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam packageStyle rectangle
+skinparam componentStyle rectangle
+skinparam linetype ortho
+skinparam ArrowColor #4B5563
+
+actor "User" as User
+rectangle "Web SPA\nReact" as SPA #E8F1FF
+rectangle "Edge Gateway / Emulator" as Gateway #FFF4E5
+
+package "SensoBazaar backend" {
+    rectangle "Edge proxy\nTraefik / nginx" as Proxy #F3E8FF
+
+    component "core-api\nSpring Boot + Spring Modulith\nprofile: api" as Api #E8F5E9
+    component "core-worker\nsame core-app artifact\nprofile: worker" as Worker #E8F5E9
+    component "ingest-app\nvalidation / normalization / DLQ" as Ingest #FFF3E0
+
+    queue "RabbitMQ\nAMQP + MQTT plugin" as MQ #FFF8D9
+    database "PostgreSQL 16\n+ TimescaleDB" as DB #E6F4FF
+}
+
+User --> SPA : browser
+SPA --> Proxy : HTTPS / SSE
+Proxy --> Api : REST / SSE
+
+Gateway --> MQ : MQTT TLS\nraw messages
+MQ --> Ingest : senso.raw
+Ingest --> MQ : senso.validated
+MQ --> Worker : validated events
+MQ --> Api : notifications / live events
+
+Api --> DB : JPA / JDBC\nFlyway migrations
+Worker --> DB : JPA / JDBC
+
+note right of Api
+REST API, SSE,
+JWT/resource-server,
+module entry points.
+end note
+
+note right of Worker
+AMQP consumers,
+outbox relay,
+scheduled jobs.
+end note
+
+note bottom of DB
+Schemas:
+platform, identity, devices,
+telemetry, alerts
+end note
+
+@enduml

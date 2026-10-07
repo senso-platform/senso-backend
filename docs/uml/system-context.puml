@@ -1,0 +1,37 @@
+@startuml
+!pragma layout smetana
+
+title SensoBazaar — System Context
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam packageStyle rectangle
+skinparam linetype ortho
+skinparam componentStyle rectangle
+skinparam ArrowColor #4B5563
+skinparam actorBorderColor #374151
+skinparam actorFontColor #111827
+
+actor "User" as User
+actor "Administrator" as Admin
+
+rectangle "Web SPA\nReact" as SPA #E8F1FF
+rectangle "SensoBazaar Backend" as Backend #EEF7EE
+rectangle "Edge Gateway / Emulator\nC++ / MQTT client" as Gateway #FFF4E5
+rectangle "Blockchain network\n(after MVP)" as Chain #F5F5F5
+rectangle "Crypto wallet\n(after MVP)" as Wallet #F5F5F5
+
+User --> SPA : HTTPS
+Admin --> SPA : HTTPS
+SPA --> Backend : REST / SSE\nJWT
+Gateway --> Backend : MQTT over TLS\nQoS 1
+Backend ..> Chain : LedgerPort / PaymentPort\nplanned
+User ..> Wallet : planned
+
+note bottom of Backend
+Current backend architecture:
+modular monolith core + separate ingest service.
+end note
+
+@enduml
