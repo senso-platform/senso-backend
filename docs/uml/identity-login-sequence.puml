@@ -1,59 +1,68 @@
 @startuml
-title Identity — Login
+
+title identity — Login (current implementation)
 
 autonumber
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam sequenceMessageAlign center
 
 actor User
 participant "Frontend" as FE
 participant "AuthController" as Controller
-participant "AuthService" as Auth
+participant "AuthenticationService" as Authentication
 participant "UserRepository" as UserRepo
-participant "PasswordEncoder\n(BCrypt)" as BCrypt
+participant "PasswordService" as Password
 participant "JwtService" as Jwt
+participant "JwtKeyProvider" as Keys
 participant "RefreshTokenService" as Refresh
-database "identity DB" as DB
+participant "RefreshTokenRepository" as RefreshRepo
+database "PostgreSQL\nidentity schema" as DB
 
-User -> FE : Enter email + password
-FE -> Controller : POST /login\nemail, password
+User -> FE : email + password
+FE -> Controller : POST /api/v1/auth/login\nLoginRequest
+Controller -> Authentication : login(email, password, null)
 
-Controller -> Auth : login(email, password)
-
-Auth -> UserRepo : findByEmail(email)
-UserRepo -> DB : SELECT user
-DB --> UserRepo : user / not found
-UserRepo --> Auth : user / not found
+Authentication -> UserRepo : findByEmail(email)
+UserRepo -> DB : SELECT user + roles
+DB --> UserRepo : User / empty
+UserRepo --> Authentication : User / empty
 
 alt user exists
-    Auth -> BCrypt : matches(rawPassword, passwordHash)
-    BCrypt --> Auth : true / false
+    Authentication -> Password : matches(rawPassword, passwordHash)
+    Password --> Authentication : true / false
 
-    alt password valid
-        Auth -> Jwt : createAccessToken(user)
-        Jwt --> Auth : access JWT
+    alt password valid and status == ACTIVE
+        Authentication -> Jwt : createAccessToken(user)
+        Jwt -> Keys : getPublicKey() / getPrivateKey()
+        Keys --> Jwt : RSA keys
+        Jwt --> Authentication : access JWT (15 min)
 
-        Auth -> Refresh : create(user)
-        Refresh -> DB : save refresh session/token
-        DB --> Refresh : saved
-        Refresh --> Auth : refresh token
+        Authentication -> Refresh : create(userId, userAgent)
+        Refresh -> Refresh : generate 32 random bytes\nBase64URL + SHA-256 hash
+        Refresh -> RefreshRepo : save(RefreshToken)
+        RefreshRepo -> DB : INSERT refresh_tokens\nexpiresAt = now + 7 days
+        DB --> RefreshRepo : saved
+        RefreshRepo --> Refresh : RefreshToken
+        Refresh --> Authentication : raw refresh token
 
-        Auth --> Controller : authentication successful
-        Controller --> FE : 200 OK\naccess JWT\nSet-Cookie: refresh
-    else password invalid
-        Auth --> Controller : authentication failed
-        Controller --> FE : 401 Unauthorized\nGeneric credentials error
+        Authentication --> Controller : LoginResult(access, refresh)
+        Controller -> Controller : build HttpOnly Secure\nSameSite=Strict cookie
+        Controller --> FE : 200 OK\nLoginResponse + Set-Cookie
+    else invalid password or inactive user
+        Authentication --> Controller : IllegalStateException
+        Controller --> FE : authentication error
     end
-
-else user does not exist
-    Auth --> Controller : authentication failed
-    Controller --> FE : 401 Unauthorized\nGeneric credentials error
+else user not found
+    Authentication --> Controller : IllegalStateException
+    Controller --> FE : authentication error
 end
 
 note right of Controller
-The external response must not reveal
-whether the account exists.
-
-Invalid email and invalid password
-produce the same authentication error.
+Current controller passes userAgent = null.
+Refresh token is returned only through
+an HttpOnly cookie.
 end note
 
 @enduml

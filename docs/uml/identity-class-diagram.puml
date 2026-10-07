@@ -1,143 +1,165 @@
 @startuml
-title Identity Module — Proposed Class Structure
+!pragma layout smetana
 
+title identity — Current Class Diagram
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Arial
 skinparam packageStyle rectangle
 skinparam classAttributeIconSize 0
+skinparam linetype ortho
+skinparam ArrowColor #4B5563
+hide empty members
 
-package "identity" {
-
-    package "api" {
-
-        interface IdentityApi {
-            + getUser(userId)
-        }
-
-        class UserInfo <<DTO>> {
-            + id
-            + email
-            + displayName
-            + roles
-            + createdAt
-        }
-    }
-
-    package "internal" {
-
-        package "domain" {
-
-            class User <<Entity>> {
-                - id
-                - email
-                - displayName
-                - passwordHash
-                - roles
-                - createdAt
-            }
-
-            enum UserRole {
-                USER
-                ADMIN
-            }
-
-            class RefreshToken <<Entity>> {
-                - id
-                - userId
-                - tokenHash
-                - expiresAt
-                - revokedAt
-                - createdAt
-                + isExpired(now)
-                + isRevoked()
-                + revoke(now)
-            }
-        }
-
-        package "persistence" {
-
-            interface UserRepository {
-                + findByEmail(email)
-                + findById(id)
-                + existsByEmail(email)
-                + save(user)
-            }
-
-            interface RefreshTokenRepository {
-                + findByTokenHash(tokenHash)
-                + save(token)
-            }
-        }
-
-        package "service" {
-
-            class AuthService {
-                + register(email, displayName, password)
-                + login(email, password)
-                + logout(refreshToken)
-            }
-
-            class JwtService {
-                + createAccessToken(user)
-                + validateAccessToken(token)
-            }
-
-            class RefreshTokenService {
-                + create(user)
-                + rotate(token)
-                + revoke(token)
-            }
-        }
-
-        package "web" {
-
-            class AuthController {
-                + register(...)
-                + login(...)
-                + refresh(...)
-                + logout(...)
-            }
-
-            class UserController {
-                + getCurrentUser(...)
-            }
-        }
+package "internal.web" #E8F1FF {
+    class AuthController <<controller>> {
+        - registrationService : RegistrationService
+        - authenticationService : AuthenticationService
+        + register(request : RegisterRequest) : ResponseEntity<UserDto>
+        + login(request : LoginRequest) : ResponseEntity<LoginResponse>
     }
 }
 
+package "internal.service" #EAF7EA {
+    class RegistrationService <<service>> {
+        - userRepository : UserRepository
+        - passwordService : PasswordService
+        - clock : Clock
+        + register(email : String, displayName : String, rawPassword : String) : User
+    }
 
-User --> UserRole
+    class AuthenticationService <<service>> {
+        - userRepository : UserRepository
+        - passwordService : PasswordService
+        - jwtService : JwtService
+        - refreshTokenService : RefreshTokenService
+        + login(email : String, rawPassword : String, userAgent : String) : LoginResult
+    }
 
-RefreshToken "0..*" --> "1" User : belongs to
+    class RefreshTokenService <<service>> {
+        - refreshTokenRepository : RefreshTokenRepository
+        - clock : Clock
+        - secureRandom : SecureRandom
+        + create(userId : UUID, userAgent : String) : String
+        - generateToken() : String
+        - hash(token : String) : byte[]
+    }
 
-AuthController --> AuthService
-AuthController --> RefreshTokenService
+    class LoginResult <<record>> {
+        + accessToken : String
+        + refreshToken : String
+    }
+}
 
-UserController --> IdentityApi
+package "internal.security" #FFF3E0 {
+    class PasswordService <<service>> {
+        - passwordEncoder : BCryptPasswordEncoder
+        + hash(rawPassword : String) : String
+        + matches(rawPassword : String, passwordHash : String) : boolean
+    }
 
-AuthService --> UserRepository
-AuthService --> JwtService
-AuthService --> RefreshTokenService
+    class JwtService <<service>> {
+        - jwtEncoder : JwtEncoder
+        - clock : Clock
+        + createAccessToken(user : User) : String
+    }
+
+    class JwtKeyProvider <<component>> {
+        - publicKey : RSAPublicKey
+        - privateKey : RSAPrivateKey
+        + getPublicKey() : RSAPublicKey
+        + getPrivateKey() : RSAPrivateKey
+    }
+}
+
+package "internal.repository" #F2ECFF {
+    interface UserRepository <<repository>> {
+        + findByEmail(email : String) : Optional<User>
+        + existsByEmail(email : String) : boolean
+        + save(user : User) : User
+    }
+
+    interface RefreshTokenRepository <<repository>> {
+        + findByTokenHash(tokenHash : byte[]) : Optional<RefreshToken>
+        + save(token : RefreshToken) : RefreshToken
+    }
+}
+
+package "internal.domain" #FDECEC {
+    class User <<entity>> {
+        - id : UUID
+        - email : String
+        - displayName : String
+        - passwordHash : String
+        - status : UserStatus
+        - createdAt : Instant
+        - updatedAt : Instant
+        - roles : Set<UserRole>
+        + getId() : UUID
+        + getEmail() : String
+        + getDisplayName() : String
+        + getPasswordHash() : String
+        + getStatus() : UserStatus
+        + getCreatedAt() : Instant
+        + getUpdatedAt() : Instant
+        + getRoles() : Set<UserRole>
+    }
+
+    class RefreshToken <<entity>> {
+        - id : UUID
+        - userId : UUID
+        - familyId : UUID
+        - tokenHash : byte[]
+        - expiresAt : Instant
+        - usedAt : Instant
+        - revokedAt : Instant
+        - createdAt : Instant
+        - userAgent : String
+    }
+
+    enum UserRole {
+        ADMIN
+        USER
+    }
+
+    enum UserStatus {
+        ACTIVE
+    }
+}
+
+interface AuthApi <<generated OpenAPI>>
+
+AuthApi <|.. AuthController
+
+AuthController --> RegistrationService
+AuthController --> AuthenticationService
+
+RegistrationService --> UserRepository
+RegistrationService --> PasswordService
+RegistrationService ..> User : creates
+
+AuthenticationService --> UserRepository
+AuthenticationService --> PasswordService
+AuthenticationService --> JwtService
+AuthenticationService --> RefreshTokenService
+AuthenticationService ..> LoginResult : returns
 
 RefreshTokenService --> RefreshTokenRepository
-RefreshTokenService --> UserRepository
-RefreshTokenService --> JwtService
-RefreshTokenService ..> RefreshToken : creates / rotates / revokes
+RefreshTokenService ..> RefreshToken : creates
+
+JwtService --> JwtKeyProvider
+JwtService ..> User
+
+User "1" o-- "0..*" UserRole : roles
+User --> UserStatus : status
+RefreshToken ..> User : logical reference by userId
 
 UserRepository ..> User : persists
 RefreshTokenRepository ..> RefreshToken : persists
 
-IdentityApi ..> UserInfo
-
-note right of IdentityApi
-Public module API.
-
-Other core modules may depend
-only on this package.
-end note
-
-note bottom of AuthService
-Application/service package placement
-may be adjusted after the core skeleton
-is finalized.
+note bottom of RefreshTokenService
+No rotate() or revoke() in the current code yet.
 end note
 
 @enduml
