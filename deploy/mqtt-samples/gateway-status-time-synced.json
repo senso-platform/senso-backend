@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "messageId": "0195f3c2-7d1e-7a4b-9c11-2b6f0e5a8e04",
+  "gatewayId": "gw-emulator-01",
+  "type": "GATEWAY_STATUS",
+  "sentAt": "2026-09-25T10:13:59.000Z",
+  "bootId": "0195f3b8-0a2b-7c3d-9e4f-a1b2c3d4e5f6",
+  "payload": {
+    "state": "ONLINE",
+    "firmware": "1.4.2",
+    "uptimeSec": 0,
+    "deviceCount": 2,
+    "queueDepth": 0,
+    "timeSynced": true
+  },
+  "signature": null
+}
