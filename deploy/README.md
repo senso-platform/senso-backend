@@ -31,6 +31,45 @@ mosquitto_pub -h localhost -p 1883 -q 1 -u gw-emulator-01 -P emulator-dev-pass \
 Сообщение должно появиться в очереди `q.ingest.raw` (RabbitMQ UI → Queues). Публикация в чужой топик
 (`senso/v1/gw/other/telemetry`) должна отклоняться.
 
+## Эмулятор IoT-шлюза
+
+Python-эмулятор из `tools/emulator` подключён к Compose через профиль `emulator`. Профиль не
+активируется обычной командой `docker compose up`, поэтому базовая инфраструктура не требует
+настройки эмулятора. Внутри Compose-сети эмулятор всегда подключается к `rabbitmq:1883`.
+
+Перед запуском скопируйте локальные значения окружения и убедитесь, что
+`SENSO_EMULATOR_PASSWORD` задан в `deploy/.env`:
+
+```powershell
+Copy-Item deploy/.env.example deploy/.env
+docker compose -f deploy/docker-compose.yml up -d --wait rabbitmq
+docker compose -f deploy/docker-compose.yml --profile emulator build emulator
+```
+
+Сценарий по умолчанию — `normal --once`:
+
+```powershell
+docker compose -f deploy/docker-compose.yml --profile emulator run --rm --no-deps emulator normal --once
+```
+
+Остальные реализованные сценарии запускаются так:
+
+```powershell
+docker compose -f deploy/docker-compose.yml --profile emulator run --rm --no-deps emulator offline
+docker compose -f deploy/docker-compose.yml --profile emulator run --rm --no-deps emulator anomaly
+docker compose -f deploy/docker-compose.yml --profile emulator run --rm --no-deps emulator discover
+docker compose -f deploy/docker-compose.yml --profile emulator run --rm --no-deps emulator duplicate
+```
+
+`--no-deps` допустим после явного ожидания RabbitMQ через `up -d --wait rabbitmq`. Пароль не
+передаётся через аргументы CLI и не включается в образ. Если пароль отсутствует, обычный запуск
+PostgreSQL и RabbitMQ не ломается, но эмулятор завершает работу с кодом `2`. Подробные параметры,
+последовательности сообщений и ограничения сценариев описаны в `tools/emulator/README.md`.
+
+Для проверки доставки без чтения и очистки общей `q.ingest.raw` используйте изолированный
+RabbitMQ и интеграционные тесты эмулятора. Рост `messages_ready` в общей очереди сам по себе не
+доказывает принадлежность сообщений конкретному запуску.
+
 Что объявлено в `rabbitmq/definitions.json`, а что кодом:
 
 - здесь: пользователи, vhost `senso`, обменники `senso.*`, входная очередь `q.ingest.raw` и DLQ-очереди.
