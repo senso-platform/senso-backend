@@ -1,0 +1,10 @@
+# local: запуск против deploy/docker-compose.yml, значения по умолчанию из deploy/.env.example.
+spring:
+  rabbitmq:
+    host: ${SENSO_RABBIT_HOST:localhost}
+    port: ${SENSO_RABBIT_AMQP_PORT:5672}
+    username: ${SENSO_RABBIT_USER:senso-ingest}
+    password: ${SENSO_RABBIT_PASSWORD:ingest-dev-pass}
+logging:
+  level:
+    dev.senso: DEBUG

@@ -1,0 +1,57 @@
+spring:
+  application.name: senso-ingest
+  threads.virtual.enabled: true
+  rabbitmq:
+    # Значений по умолчанию нет намеренно: в контейнере их задаёт окружение, локально — профиль local.
+    host: ${SENSO_RABBIT_HOST}
+    port: ${SENSO_RABBIT_AMQP_PORT:5672}
+    username: ${SENSO_RABBIT_USER}
+    password: ${SENSO_RABBIT_PASSWORD}
+    virtual-host: senso
+    # Публикация в senso.validated / senso.dlq подтверждается брокером (ack исходного — только после confirm).
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+    listener:
+      simple:
+        acknowledge-mode: auto
+        prefetch: 50
+        concurrency: 2
+        max-concurrency: 4
+        # Техническая ошибка (брокер, nack, таймаут confirm, unroutable) → 3 повтора в листенере с паузой
+        # 0.5 → 1 → 2 с, затем RejectAndDontRequeueRecoverer: reject без requeue → DLX senso.dlq / failed →
+        # q.dlq.failed (AGENTS.md §6). Requeue не используем: в RabbitMQ 4.x он растит x-acquired-count, а
+        # x-delivery-limit считает только x-delivery-count — сообщение крутилось бы бесконечно
+        # (docs/bootstrap/HANDOFF-20261019-s2.md §3). x-delivery-limit на q.ingest.raw остаётся защитой
+        # от падений самого ingest посреди обработки.
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          stateless: true
+          max-retries: 3
+          initial-interval: 500ms
+          multiplier: 2
+          max-interval: 5s
+
+# HTTP только для actuator.
+server:
+  port: 8082
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+# Ограничения приёмного фильтра (ADR-0001 §6.2, contracts/mqtt/TOPICS.md).
+senso:
+  ingest:
+    max-message-bytes: 262144
+    max-future-skew: 5m
+    confirm-timeout: 5s
+    signature-required: false

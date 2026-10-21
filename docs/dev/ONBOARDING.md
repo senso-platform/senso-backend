@@ -79,12 +79,35 @@ curl -i localhost:8080/api/v1/nope              # 404, application/problem+json,
 
 Без профиля приложение не стартует с сообщением `core-app needs a role profile` — так и задумано.
 
+## 4.1. Запуск `ingest-app`
+
+Нужен только RabbitMQ из compose (`docker compose -f deploy/docker-compose.yml up -d rabbitmq`). Профиль `local`
+подставляет `localhost:5672`, пользователя `senso-ingest` и пароль из `deploy/.env.example`.
+
+```bash
+./mvnw -pl ingest-app -am spring-boot:run -Dspring-boot.run.profiles=local
+# или из собранного jar:
+./mvnw -pl ingest-app -am package -DskipTests
+java -jar ingest-app/target/ingest-app-0.1.0-SNAPSHOT.jar --spring.profiles.active=local
+```
+
+Проверка: `curl -s localhost:8082/actuator/health` → `{"status":"UP",...}`, затем отправить сообщение шлюза
+(`mosquitto_pub` из `deploy/README.md`) — в логе ingest строка
+`Raw message received: gatewayId=gw-emulator-01 channel=telemetry bytes=…`, очередь `q.ingest.raw` пустая.
+
+Без профиля и без переменных `SENSO_RABBIT_HOST/USER/PASSWORD` приложение не стартует с сообщением
+`ingest-app has no RabbitMQ settings … run with profile local` — так и задумано. Если ingest падает с
+`PRECONDITION_FAILED - inequivalent arg 'x-delivery-limit'`, у брокера старый volume: см. `deploy/README.md`.
+
 ## 5. IntelliJ IDEA
 
 - [ ] Открыть корневой `pom.xml` как проект. После первого `./mvnw verify` — Maven → **Reload All Maven Projects**:
       появятся сгенерированные из OpenAPI интерфейсы (`core-app/target/generated-sources/openapi`,
       пакет `dev.senso.openapi`). Красные импорты `dev.senso.openapi.*` = не было сборки или reload.
 - [ ] Settings → Build → Compiler → Annotation Processors → **Enable annotation processing** (MapStruct).
+- [ ] Project Structure → **SDK = JDK 21** (или новее), Language level = 21. С SDK 17 IDEA собирает код, который
+      Maven (`release 21`) принимает, с ошибками вида `HttpClient cannot be converted to AutoCloseable`.
+- [ ] Run Configuration для `IngestApplication`: **Active profiles** = `local`.
 - [ ] Run Configuration для `CoreApplication`: **Active profiles** = `local`; если порт БД не 5432 —
       Environment variables: `SENSO_DB_URL=jdbc:postgresql://localhost:5433/senso`.
       Пустую или неполную `SENSO_DB_URL` не оставляй: она перекрывает дефолт и роняет старт (`'url' must start with "jdbc"`).
