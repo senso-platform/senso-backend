@@ -1,7 +1,7 @@
 # Локальная инфраструктура SensoBazaar.
 #   docker compose -f deploy/docker-compose.yml up -d                     # postgres + rabbitmq
 #   docker compose -f deploy/docker-compose.yml --profile app up -d       # + core-api, core-worker, ingest   (TODO)
-#   docker compose -f deploy/docker-compose.yml --profile emulator up -d  # + эмулятор шлюза                  (TODO)
+#   docker compose -f deploy/docker-compose.yml --profile emulator up     # + одноразовый эмулятор шлюза
 #
 # Перед первым запуском: cp deploy/.env.example deploy/.env
 # Порты публикуются только на 127.0.0.1.
@@ -74,7 +74,22 @@ services:
   # ingest:      build ingest-app, depends_on rabbitmq: service_healthy
 
   # --- profile: emulator -------------------------------------------------------------------
-  # TODO: эмулятор шлюза (tools/emulator), подключение к rabbitmq:1883 под gw-emulator-01.
+  emulator:
+    profiles: [emulator]
+    build:
+      context: ../tools/emulator
+      dockerfile: Dockerfile
+    environment:
+      SENSO_MQTT_HOST: rabbitmq
+      SENSO_MQTT_PORT: "1883"
+      SENSO_EMULATOR_GATEWAY_ID: ${SENSO_EMULATOR_GATEWAY_ID:-gw-emulator-01}
+      # Пустое значение не ломает обычный Compose без профиля; сам эмулятор отклонит такой запуск.
+      SENSO_EMULATOR_PASSWORD: ${SENSO_EMULATOR_PASSWORD:-}
+    command: ["normal", "--once"]
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: "no"
 
 volumes:
   pg-data:
