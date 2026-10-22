@@ -1,11 +1,21 @@
 package dev.senso.core.identity.internal.domain;
 
-import jakarta.persistence.*;
-
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "users", schema = "identity")
@@ -14,12 +24,8 @@ public class User {
     @Id
     private UUID id;
 
-    @Column(
-        name = "email",
-        nullable = false,
-        unique = true,
-        columnDefinition = "citext"
-    )
+    @JdbcTypeCode(SqlTypes.OTHER)
+    @Column(name = "email", nullable = false, unique = true, columnDefinition = "citext")
     private String email;
 
     @Column(name = "display_name", nullable = false, length = 128)
@@ -39,28 +45,22 @@ public class User {
     private Instant updatedAt;
 
     @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(
-        name = "user_roles",
-        schema = "identity",
-        joinColumns = @JoinColumn(name = "user_id")
-    )
+    @CollectionTable(name = "user_roles", schema = "identity", joinColumns = @JoinColumn(name = "user_id"))
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 32)
     private Set<UserRole> roles = new HashSet<>();
 
-    protected User() {
-    }
+    protected User() {}
 
     public User(
-        UUID id,
-        String email,
-        String displayName,
-        String passwordHash,
-        UserStatus status,
-        Instant createdAt,
-        Instant updatedAt,
-        Set<UserRole> roles
-    ) {
+            UUID id,
+            String email,
+            String displayName,
+            String passwordHash,
+            UserStatus status,
+            Instant createdAt,
+            Instant updatedAt,
+            Set<UserRole> roles) {
         this.id = id;
         this.email = email;
         this.displayName = displayName;
@@ -68,7 +68,7 @@ public class User {
         this.status = status;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
-        this.roles = roles;
+        this.roles = new HashSet<>(roles);
     }
 
     public UUID getId() {

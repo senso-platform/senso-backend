@@ -17,7 +17,7 @@ import org.springframework.web.client.RestClient;
  * {@code @ApiRole} (или наоборот) — такое иначе всплывает только на стенде.
  */
 @ActiveProfiles("worker")
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "spring.flyway.enabled=true")
 class CoreWorkerContextIT extends IntegrationTestBase {
 
     @Autowired
