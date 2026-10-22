@@ -131,9 +131,11 @@ PostgreSQL, подними контейнер на свободном порту
 ./mvnw -pl ingest-app -am spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
-На Windows используйте `mvnw.cmd`.
+На Windows используйте `mvnw.cmd`. В IDEA: Run Configuration для `CoreApplication` / `IngestApplication`,
+**Active profiles** = `local` (без профиля оба приложения не стартуют и пишут, чего не хватает).
 
 API: http://localhost:8080/api/v1, health: http://localhost:8080/actuator/health.
+`ingest` — только actuator: http://localhost:8082/actuator/health, метрики `/actuator/prometheus`.
 
 ### 4. Или всё в контейнерах (появится вместе с Dockerfile-ами, пока не работает)
 

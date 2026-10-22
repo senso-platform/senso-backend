@@ -83,6 +83,10 @@ docker exec senso-postgres-1 psql -U senso -d postgres -c "DROP DATABASE migtest
 | `rabbitmqctl list_queues -v senso` | короткий флаг невалиден | `--vhost senso`; для bindings удобнее management API: `curl -u senso-admin:*** http://localhost:15672/api/bindings/senso` |
 | `list_queues` показывает 0 сообщений на quorum | статистика quorum отстаёт | смотреть `/api/queues/senso/q.ingest.raw` (`messages_ready`) |
 | Пересчёт пароля для definitions.json | нужен `sha256`-хэш | `python deploy/rabbitmq/hash_password.py <пароль>` |
+| Сообщение возвращается в quorum-очередь тысячи раз, `x-delivery-limit` не уводит его в DLX | в 4.x `nack`/`reject` с `requeue=true` растит `x-acquired-count`, а лимит считает `x-delivery-count` (растёт только при падении потребителя) | requeue-петлю не строить на `x-delivery-limit`; повторы — retry в листенере + reject без requeue (см. `HANDOFF-20261019-s2.md` §3) |
+| `spring.rabbitmq.listener.simple.retry.max-attempts` не принимается | в Boot 4.x свойство удалено | `max-retries` — число повторов без первой попытки (`3` = 4 попытки) |
+| `PUT /api/queues/...` с `"durable": false` → 400 | transient non-exclusive очереди в 4.x запрещены | временные очереди для проверки — durable quorum, после проверки удалить |
+| `PRECONDITION_FAILED - inequivalent arg ...` после правки `definitions.json` | аргументы существующей очереди не меняются, старый volume брокера | пересоздать volume брокера, см. `deploy/README.md` |
 
 ### 7. ArchUnit 1.5.1
 
