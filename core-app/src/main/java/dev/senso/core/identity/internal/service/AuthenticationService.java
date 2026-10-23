@@ -16,25 +16,20 @@ public class AuthenticationService {
     private final RefreshTokenService refreshTokenService;
 
     public AuthenticationService(
-        UserRepository userRepository,
-        PasswordService passwordService,
-        JwtService jwtService,
-        RefreshTokenService refreshTokenService
-    ) {
+            UserRepository userRepository,
+            PasswordService passwordService,
+            JwtService jwtService,
+            RefreshTokenService refreshTokenService) {
         this.userRepository = userRepository;
         this.passwordService = passwordService;
         this.jwtService = jwtService;
         this.refreshTokenService = refreshTokenService;
     }
 
-    public LoginResult login(
-        String email,
-        String rawPassword,
-        String userAgent
-    ) {
+    public LoginResult login(String email, String rawPassword, String userAgent) {
 
-        User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new IllegalStateException("Invalid credentials"));
+        User user =
+                userRepository.findByEmail(email).orElseThrow(() -> new IllegalStateException("Invalid credentials"));
 
         if (!passwordService.matches(rawPassword, user.getPasswordHash())) {
             throw new IllegalStateException("Invalid credentials");
@@ -46,14 +41,8 @@ public class AuthenticationService {
 
         String accessToken = jwtService.createAccessToken(user);
 
-        String refreshToken = refreshTokenService.create(
-            user.getId(),
-            userAgent
-        );
+        String refreshToken = refreshTokenService.create(user.getId(), userAgent);
 
-        return new LoginResult(
-            accessToken,
-            refreshToken
-        );
+        return new LoginResult(accessToken, refreshToken);
     }
 }

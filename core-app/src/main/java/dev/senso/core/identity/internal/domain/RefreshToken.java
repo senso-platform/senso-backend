@@ -1,11 +1,10 @@
-//для аутентификации последующих запросов
+// для аутентификации последующих запросов
 package dev.senso.core.identity.internal.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-
 import java.time.Instant;
 import java.util.UUID;
 
@@ -40,18 +39,16 @@ public class RefreshToken {
     @Column(name = "user_agent", length = 256)
     private String userAgent;
 
-    protected RefreshToken() {
-    }
+    protected RefreshToken() {}
 
     public RefreshToken(
-        UUID id,
-        UUID userId,
-        UUID familyId,
-        byte[] tokenHash,
-        Instant expiresAt,
-        Instant createdAt,
-        String userAgent
-    ) {
+            UUID id,
+            UUID userId,
+            UUID familyId,
+            byte[] tokenHash,
+            Instant expiresAt,
+            Instant createdAt,
+            String userAgent) {
         this.id = id;
         this.userId = userId;
         this.familyId = familyId;

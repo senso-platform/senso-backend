@@ -1,11 +1,10 @@
-
 package dev.senso.core.identity.internal.service;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 import dev.senso.core.identity.internal.security.PasswordService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class PasswordServiceTest {
 
@@ -32,10 +31,7 @@ class PasswordServiceTest {
         String rawPassword = "Password123!";
         String hash = passwordService.hash(rawPassword);
 
-        boolean result = passwordService.matches(
-            rawPassword,
-            hash
-        );
+        boolean result = passwordService.matches(rawPassword, hash);
 
         assertTrue(result);
     }
@@ -44,10 +40,7 @@ class PasswordServiceTest {
     void shouldRejectIncorrectPassword() {
         String hash = passwordService.hash("Password123!");
 
-        boolean result = passwordService.matches(
-            "WrongPassword",
-            hash
-        );
+        boolean result = passwordService.matches("WrongPassword", hash);
 
         assertFalse(result);
     }

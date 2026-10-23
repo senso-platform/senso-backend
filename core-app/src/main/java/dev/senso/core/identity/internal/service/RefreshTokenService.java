@@ -3,8 +3,6 @@ package dev.senso.core.identity.internal.service;
 import dev.senso.core.identity.internal.domain.RefreshToken;
 import dev.senso.core.identity.internal.repository.RefreshTokenRepository;
 import dev.senso.kernel.id.Ids;
-import org.springframework.stereotype.Service;
-
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.Clock;
@@ -12,6 +10,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.UUID;
+import org.springframework.stereotype.Service;
 
 @Service
 public class RefreshTokenService {
@@ -20,10 +19,7 @@ public class RefreshTokenService {
     private final Clock clock;
     private final SecureRandom secureRandom = new SecureRandom();
 
-    public RefreshTokenService(
-        RefreshTokenRepository refreshTokenRepository,
-        Clock clock
-    ) {
+    public RefreshTokenService(RefreshTokenRepository refreshTokenRepository, Clock clock) {
         this.refreshTokenRepository = refreshTokenRepository;
         this.clock = clock;
     }
@@ -36,14 +32,7 @@ public class RefreshTokenService {
         Instant now = clock.instant();
 
         RefreshToken refreshToken = new RefreshToken(
-            Ids.newId(),
-            userId,
-            Ids.newId(),
-            tokenHash,
-            now.plus(7, ChronoUnit.DAYS),
-            now,
-            userAgent
-        );
+                Ids.newId(), userId, Ids.newId(), tokenHash, now.plus(7, ChronoUnit.DAYS), now, userAgent);
 
         refreshTokenRepository.save(refreshToken);
 
@@ -53,9 +42,7 @@ public class RefreshTokenService {
     private String generateToken() {
         byte[] bytes = new byte[32];
         secureRandom.nextBytes(bytes);
-        return Base64.getUrlEncoder()
-            .withoutPadding()
-            .encodeToString(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
     private byte[] hash(String token) {
