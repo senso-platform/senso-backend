@@ -1,0 +1,83 @@
+@startuml
+title SensoBazaar Core — Module Architecture
+
+left to right direction
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+package "core-app" {
+
+    package "identity" as identity {
+        [identity::api] as IdentityApi
+        [identity::internal] as IdentityInternal
+    }
+
+    package "devices" as devices {
+        [devices::api] as DevicesApi
+        [devices::internal] as DevicesInternal
+    }
+
+    package "telemetry" as telemetry {
+        [telemetry::api] as TelemetryApi
+        [telemetry::internal] as TelemetryInternal
+    }
+
+    package "alerts" as alerts {
+        [alerts::api] as AlertsApi
+        [alerts::internal] as AlertsInternal
+    }
+
+    package "realtime" as realtime {
+        [realtime::api] as RealtimeApi
+        [realtime::internal] as RealtimeInternal
+    }
+}
+
+IdentityInternal -up-> IdentityApi
+DevicesInternal -up-> DevicesApi
+TelemetryInternal -up-> TelemetryApi
+AlertsInternal -up-> AlertsApi
+RealtimeInternal -up-> RealtimeApi
+
+DevicesInternal ..> IdentityApi : uses
+TelemetryInternal ..> DevicesApi : uses
+AlertsInternal ..> DevicesApi : uses
+RealtimeInternal ..> DevicesApi : uses
+RealtimeInternal ..> AlertsApi : uses
+
+note bottom of identity
+Users, roles,
+login, JWT,
+refresh rotation
+end note
+
+note bottom of devices
+Gateways, devices,
+statuses, online/offline,
+MQTT authorization
+end note
+
+note bottom of telemetry
+Measurements,
+aggregates,
+live values
+end note
+
+note bottom of alerts
+SECURITY_EVENT,
+deduplication,
+alert lifecycle
+end note
+
+note bottom of realtime
+SSE,
+subscriber registry,
+owner filtering
+end note
+
+legend right
+  ..>  allowed dependency through public API
+  internal of another module is not accessible
+endlegend
+
+@enduml
