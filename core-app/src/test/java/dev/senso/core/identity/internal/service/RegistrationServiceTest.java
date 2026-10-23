@@ -1,27 +1,23 @@
-
 package dev.senso.core.identity.internal.service;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 import dev.senso.core.identity.internal.domain.User;
 import dev.senso.core.identity.internal.domain.UserRole;
 import dev.senso.core.identity.internal.domain.UserStatus;
 import dev.senso.core.identity.internal.repository.UserRepository;
 import dev.senso.core.identity.internal.security.PasswordService;
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Set;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class RegistrationServiceTest {
@@ -34,21 +30,13 @@ class RegistrationServiceTest {
 
     private RegistrationService registrationService;
 
-    private final Instant fixedTime =
-        Instant.parse("2026-10-08T12:00:00Z");
+    private final Instant fixedTime = Instant.parse("2026-10-08T12:00:00Z");
 
     @BeforeEach
     void setUp() {
-        Clock clock = Clock.fixed(
-            fixedTime,
-            java.time.ZoneOffset.UTC
-        );
+        Clock clock = Clock.fixed(fixedTime, java.time.ZoneOffset.UTC);
 
-        registrationService = new RegistrationService(
-            userRepository,
-            passwordService,
-            clock
-        );
+        registrationService = new RegistrationService(userRepository, passwordService, clock);
     }
 
     @Test
@@ -58,21 +46,14 @@ class RegistrationServiceTest {
         String displayName = "Test User";
         String password = "Password123!";
 
-        when(userRepository.existsByEmail(email))
-            .thenReturn(false);
+        when(userRepository.existsByEmail(email)).thenReturn(false);
 
-        when(passwordService.hash(password))
-            .thenReturn("hashedPassword");
+        when(passwordService.hash(password)).thenReturn("hashedPassword");
 
-        when(userRepository.save(any(User.class)))
-            .thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
-        User result = registrationService.register(
-            email,
-            displayName,
-            password
-        );
+        User result = registrationService.register(email, displayName, password);
 
         // Assert
         assertNotNull(result);
@@ -94,18 +75,11 @@ class RegistrationServiceTest {
         // Arrange
         String email = "test@example.com";
 
-        when(userRepository.existsByEmail(email))
-            .thenReturn(true);
+        when(userRepository.existsByEmail(email)).thenReturn(true);
 
         // Act + Assert
         IllegalStateException exception = assertThrows(
-            IllegalStateException.class,
-            () -> registrationService.register(
-                email,
-                "Test User",
-                "Password123!"
-            )
-        );
+                IllegalStateException.class, () -> registrationService.register(email, "Test User", "Password123!"));
 
         assertEquals("email exist", exception.getMessage());
 
@@ -118,22 +92,15 @@ class RegistrationServiceTest {
         // Arrange
         String rawPassword = "Password123!";
 
-        when(passwordService.hash(rawPassword))
-            .thenReturn("secureHash");
+        when(passwordService.hash(rawPassword)).thenReturn("secureHash");
 
-        when(userRepository.save(any(User.class)))
-            .thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
-        registrationService.register(
-            "test@example.com",
-            "Test User",
-            rawPassword
-        );
+        registrationService.register("test@example.com", "Test User", rawPassword);
 
         // Assert
-        ArgumentCaptor<User> captor =
-            ArgumentCaptor.forClass(User.class);
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
 
         verify(userRepository).save(captor.capture());
 
@@ -148,15 +115,10 @@ class RegistrationServiceTest {
     @Test
     void shouldAssignDefaultRoleAndStatus() {
         // Arrange
-        when(userRepository.save(any(User.class)))
-            .thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
-        User result = registrationService.register(
-            "test@example.com",
-            "Test User",
-            "Password123!"
-        );
+        User result = registrationService.register("test@example.com", "Test User", "Password123!");
 
         // Assert
         assertEquals(UserStatus.ACTIVE, result.getStatus());

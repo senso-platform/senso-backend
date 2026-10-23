@@ -1,19 +1,12 @@
-
 package dev.senso.core.identity.internal.service;
 
-import com.nimbusds.jose.JWSAlgorithm;
+import static org.junit.jupiter.api.Assertions.*;
+
 import dev.senso.core.identity.internal.domain.User;
 import dev.senso.core.identity.internal.domain.UserRole;
 import dev.senso.core.identity.internal.domain.UserStatus;
-
 import dev.senso.core.identity.internal.security.JwtKeyProvider;
 import dev.senso.core.identity.internal.security.JwtService;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-
-import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
-import org.springframework.security.oauth2.jwt.*;
-
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -21,13 +14,14 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
+import org.springframework.security.oauth2.jwt.*;
 
 class JwtServiceTest {
 
-    private static final Instant NOW =
-        Instant.parse("2026-10-08T12:00:00Z");
+    private static final Instant NOW = Instant.parse("2026-10-08T12:00:00Z");
 
     private static JwtKeyProvider keyProvider;
     private static JwtService jwtService;
@@ -42,32 +36,25 @@ class JwtServiceTest {
 
         jwtService = new JwtService(keyProvider, clock);
 
+        jwtDecoder = NimbusJwtDecoder.withPublicKey(keyProvider.getPublicKey())
+                .signatureAlgorithm(SignatureAlgorithm.RS256)
+                .build();
 
-        jwtDecoder = NimbusJwtDecoder
-            .withPublicKey(keyProvider.getPublicKey())
-            .signatureAlgorithm(SignatureAlgorithm.RS256)
-            .build();
+        JwtTimestampValidator validator = new JwtTimestampValidator(Duration.ZERO);
 
-        JwtTimestampValidator validator =
-            new JwtTimestampValidator(Duration.ZERO);
-
-        validator.setClock(
-            Clock.fixed(NOW.plusSeconds(60), ZoneOffset.UTC)
-        );
+        validator.setClock(Clock.fixed(NOW.plusSeconds(60), ZoneOffset.UTC));
 
         jwtDecoder.setJwtValidator(validator);
 
-
         user = new User(
-            UUID.randomUUID(),
-            "test@example.com",
-            "Test User",
-            "hashedPassword",
-            UserStatus.ACTIVE,
-            NOW,
-            NOW,
-            Set.of(UserRole.USER)
-        );
+                UUID.randomUUID(),
+                "test@example.com",
+                "Test User",
+                "hashedPassword",
+                UserStatus.ACTIVE,
+                NOW,
+                NOW,
+                Set.of(UserRole.USER));
     }
 
     @Test
@@ -108,12 +95,8 @@ class JwtServiceTest {
 
         String tamperedToken = String.join(".", parts);
 
-        assertThrows(
-            JwtException.class,
-            () -> jwtDecoder.decode(tamperedToken)
-        );
+        assertThrows(JwtException.class, () -> jwtDecoder.decode(tamperedToken));
     }
-
 
     @Test
     void shouldRejectExpiredToken() {
@@ -122,27 +105,19 @@ class JwtServiceTest {
 
         Instant later = NOW.plusSeconds(901);
 
-        NimbusJwtDecoder expiredDecoder = NimbusJwtDecoder
-            .withPublicKey(keyProvider.getPublicKey())
-            .signatureAlgorithm(SignatureAlgorithm.RS256)
-            .build();
+        NimbusJwtDecoder expiredDecoder = NimbusJwtDecoder.withPublicKey(keyProvider.getPublicKey())
+                .signatureAlgorithm(SignatureAlgorithm.RS256)
+                .build();
 
-        JwtTimestampValidator validator =
-            new JwtTimestampValidator(Duration.ZERO);
+        JwtTimestampValidator validator = new JwtTimestampValidator(Duration.ZERO);
 
-        validator.setClock(
-            Clock.fixed(later, ZoneOffset.UTC)
-        );
+        validator.setClock(Clock.fixed(later, ZoneOffset.UTC));
 
         expiredDecoder.setJwtValidator(validator);
 
         // Act + Assert
-        assertThrows(
-            JwtException.class,
-            () -> expiredDecoder.decode(token)
-        );
+        assertThrows(JwtException.class, () -> expiredDecoder.decode(token));
     }
-
 
     @Test
     void shouldRejectTokenSignedWithAnotherKey() {
@@ -150,15 +125,10 @@ class JwtServiceTest {
 
         JwtKeyProvider otherKeyProvider = new JwtKeyProvider();
 
-        NimbusJwtDecoder otherDecoder =
-            NimbusJwtDecoder
-                .withPublicKey(otherKeyProvider.getPublicKey())
+        NimbusJwtDecoder otherDecoder = NimbusJwtDecoder.withPublicKey(otherKeyProvider.getPublicKey())
                 .signatureAlgorithm(SignatureAlgorithm.RS256)
                 .build();
 
-        assertThrows(
-            JwtException.class,
-            () -> otherDecoder.decode(token)
-        );
+        assertThrows(JwtException.class, () -> otherDecoder.decode(token));
     }
 }
