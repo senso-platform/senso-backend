@@ -6,11 +6,15 @@ import dev.senso.core.identity.internal.domain.User;
 import dev.senso.core.identity.internal.domain.UserRole;
 import dev.senso.core.identity.internal.domain.UserStatus;
 import dev.senso.core.identity.internal.security.JwtKeyProvider;
+import dev.senso.core.identity.internal.security.JwtProperties;
 import dev.senso.core.identity.internal.security.JwtService;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Base64;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -30,7 +34,7 @@ class JwtServiceTest {
 
     @BeforeAll
     static void setUp() {
-        keyProvider = new JwtKeyProvider();
+        keyProvider = createTestKeyProvider();
 
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
 
@@ -87,7 +91,7 @@ class JwtServiceTest {
 
         String[] parts = token.split("\\.");
 
-        // Меняем один символ подписи, сохраняя её формат.
+        // Меняем один символ подписи.
         char first = parts[2].charAt(0);
         char replacement = first == 'A' ? 'B' : 'A';
 
@@ -123,12 +127,51 @@ class JwtServiceTest {
     void shouldRejectTokenSignedWithAnotherKey() {
         String token = jwtService.createAccessToken(user);
 
-        JwtKeyProvider otherKeyProvider = new JwtKeyProvider();
+        JwtKeyProvider otherKeyProvider = createTestKeyProvider();
 
         NimbusJwtDecoder otherDecoder = NimbusJwtDecoder.withPublicKey(otherKeyProvider.getPublicKey())
                 .signatureAlgorithm(SignatureAlgorithm.RS256)
                 .build();
 
         assertThrows(JwtException.class, () -> otherDecoder.decode(token));
+    }
+
+    private static JwtKeyProvider createTestKeyProvider() {
+        try {
+            KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
+
+            generator.initialize(2048);
+
+            KeyPair keyPair = generator.generateKeyPair();
+
+            String publicKeyPem = toPem("PUBLIC KEY", keyPair.getPublic().getEncoded());
+
+            String privateKeyPem = toPem("PRIVATE KEY", keyPair.getPrivate().getEncoded());
+
+            JwtProperties properties = new JwtProperties(publicKeyPem, privateKeyPem);
+
+            return new JwtKeyProvider(properties);
+
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to generate test RSA keys", e);
+        }
+    }
+
+    @Test
+    void shouldContainKeyIdInHeader() {
+        String token = jwtService.createAccessToken(user);
+
+        Jwt jwt = jwtDecoder.decode(token);
+
+        String keyId = jwt.getHeaders().get("kid").toString();
+
+        assertNotNull(keyId);
+        assertFalse(keyId.isBlank());
+    }
+
+    private static String toPem(String type, byte[] encoded) {
+        return "-----BEGIN " + type + "-----\n"
+                + Base64.getMimeEncoder(64, new byte[] {'\n'}).encodeToString(encoded)
+                + "\n-----END " + type + "-----";
     }
 }

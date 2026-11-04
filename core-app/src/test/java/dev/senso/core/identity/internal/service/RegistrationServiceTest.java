@@ -9,8 +9,10 @@ import dev.senso.core.identity.internal.domain.UserRole;
 import dev.senso.core.identity.internal.domain.UserStatus;
 import dev.senso.core.identity.internal.repository.UserRepository;
 import dev.senso.core.identity.internal.security.PasswordService;
+import dev.senso.kernel.error.ConflictException;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,7 +36,7 @@ class RegistrationServiceTest {
 
     @BeforeEach
     void setUp() {
-        Clock clock = Clock.fixed(fixedTime, java.time.ZoneOffset.UTC);
+        Clock clock = Clock.fixed(fixedTime, ZoneOffset.UTC);
 
         registrationService = new RegistrationService(userRepository, passwordService, clock);
     }
@@ -47,9 +49,7 @@ class RegistrationServiceTest {
         String password = "Password123!";
 
         when(userRepository.existsByEmail(email)).thenReturn(false);
-
         when(passwordService.hash(password)).thenReturn("hashedPassword");
-
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
@@ -66,6 +66,7 @@ class RegistrationServiceTest {
         assertEquals(fixedTime, result.getCreatedAt());
         assertEquals(fixedTime, result.getUpdatedAt());
 
+        verify(userRepository).existsByEmail(email);
         verify(passwordService).hash(password);
         verify(userRepository).save(any(User.class));
     }
@@ -78,10 +79,10 @@ class RegistrationServiceTest {
         when(userRepository.existsByEmail(email)).thenReturn(true);
 
         // Act + Assert
-        IllegalStateException exception = assertThrows(
-                IllegalStateException.class, () -> registrationService.register(email, "Test User", "Password123!"));
+        ConflictException exception = assertThrows(
+                ConflictException.class, () -> registrationService.register(email, "Test User", "Password123!"));
 
-        assertEquals("email exist", exception.getMessage());
+        assertEquals("Email is already registered", exception.getMessage());
 
         verify(userRepository, never()).save(any(User.class));
         verifyNoInteractions(passwordService);
@@ -93,7 +94,6 @@ class RegistrationServiceTest {
         String rawPassword = "Password123!";
 
         when(passwordService.hash(rawPassword)).thenReturn("secureHash");
-
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
@@ -123,5 +123,28 @@ class RegistrationServiceTest {
         // Assert
         assertEquals(UserStatus.ACTIVE, result.getStatus());
         assertEquals(Set.of(UserRole.USER), result.getRoles());
+    }
+
+    @Test
+    void shouldNormalizeEmailDuringRegistration() {
+        // Arrange
+        String email = " TEST@EXAMPLE.COM ";
+
+        when(passwordService.hash("Password123!")).thenReturn("hashedPassword");
+
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Act
+        User result = registrationService.register(email, "Test User", "Password123!");
+
+        // Assert
+        assertEquals("test@example.com", result.getEmail());
+
+        verify(userRepository).existsByEmail("test@example.com");
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(captor.capture());
+
+        assertEquals("test@example.com", captor.getValue().getEmail());
     }
 }

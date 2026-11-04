@@ -5,11 +5,13 @@ import dev.senso.core.identity.internal.domain.UserRole;
 import dev.senso.core.identity.internal.domain.UserStatus;
 import dev.senso.core.identity.internal.repository.UserRepository;
 import dev.senso.core.identity.internal.security.PasswordService;
+import dev.senso.kernel.error.ConflictException;
 import dev.senso.kernel.id.Ids;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Set;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RegistrationService {
@@ -24,16 +26,20 @@ public class RegistrationService {
         this.clock = clock;
     }
 
+    @Transactional
     public User register(String email, String displayName, String rawPassword) {
-        if (userRepository.existsByEmail(email)) {
-            throw new IllegalStateException("email exist");
+
+        String normalizedEmail = EmailNormalizer.normalizeEmail(email);
+
+        if (userRepository.existsByEmail(normalizedEmail)) {
+            throw new ConflictException("Email is already registered");
         }
 
         Instant now = clock.instant();
 
         User user = new User(
                 Ids.newId(),
-                email,
+                normalizedEmail,
                 displayName,
                 passwordService.hash(rawPassword),
                 UserStatus.ACTIVE,
