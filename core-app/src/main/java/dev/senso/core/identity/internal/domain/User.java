@@ -14,8 +14,6 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "users", schema = "identity")
@@ -24,8 +22,7 @@ public class User {
     @Id
     private UUID id;
 
-    @JdbcTypeCode(SqlTypes.OTHER)
-    @Column(name = "email", nullable = false, unique = true, columnDefinition = "citext")
+    @Column(name = "email", nullable = false, length = 254, unique = true)
     private String email;
 
     @Column(name = "display_name", nullable = false, length = 128)

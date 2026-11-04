@@ -4,18 +4,21 @@ import dev.senso.core.identity.internal.domain.User;
 import dev.senso.core.identity.internal.service.AuthenticationService;
 import dev.senso.core.identity.internal.service.LoginResult;
 import dev.senso.core.identity.internal.service.RegistrationService;
+import dev.senso.core.shared.role.ApiRole;
 import dev.senso.openapi.api.AuthApi;
 import dev.senso.openapi.model.LoginRequest;
 import dev.senso.openapi.model.LoginResponse;
 import dev.senso.openapi.model.RegisterRequest;
 import dev.senso.openapi.model.UserDto;
+import java.time.Duration;
 import java.time.ZoneOffset;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RestController;
 
-@Controller
+@RestController
+@ApiRole
 public class AuthController implements AuthApi {
 
     private final RegistrationService registrationService;
@@ -53,6 +56,7 @@ public class AuthController implements AuthApi {
                 .secure(true)
                 .sameSite("Strict")
                 .path("/api/v1/auth")
+                .maxAge(Duration.ofDays(7))
                 .build();
 
         LoginResponse response = new LoginResponse()

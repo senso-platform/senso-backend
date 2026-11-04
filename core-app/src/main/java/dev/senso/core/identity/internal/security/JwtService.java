@@ -5,9 +5,12 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.proc.SecurityContext;
 import dev.senso.core.identity.internal.domain.User;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Base64;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
@@ -24,6 +27,7 @@ public class JwtService {
 
         RSAKey rsaKey = new RSAKey.Builder(keyProvider.getPublicKey())
                 .privateKey(keyProvider.getPrivateKey())
+                .keyID(createKeyId(keyProvider))
                 .build();
 
         this.jwtEncoder = new NimbusJwtEncoder(new ImmutableJWKSet<SecurityContext>(new JWKSet(rsaKey)));
@@ -43,5 +47,18 @@ public class JwtService {
                 .build();
 
         return jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+    }
+
+    private static String createKeyId(JwtKeyProvider keyProvider) {
+        try {
+            byte[] publicKeyBytes = keyProvider.getPublicKey().getEncoded();
+
+            byte[] hash = MessageDigest.getInstance("SHA-256").digest(publicKeyBytes);
+
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(hash);
+
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("Failed to calculate JWT key ID", e);
+        }
     }
 }

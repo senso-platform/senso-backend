@@ -11,6 +11,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RefreshTokenService {
@@ -24,6 +25,7 @@ public class RefreshTokenService {
         this.clock = clock;
     }
 
+    @Transactional
     public String create(UUID userId, String userAgent) {
 
         String rawToken = generateToken();

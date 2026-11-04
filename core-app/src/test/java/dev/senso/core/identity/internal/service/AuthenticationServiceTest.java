@@ -9,6 +9,7 @@ import dev.senso.core.identity.internal.domain.UserStatus;
 import dev.senso.core.identity.internal.repository.UserRepository;
 import dev.senso.core.identity.internal.security.JwtService;
 import dev.senso.core.identity.internal.security.PasswordService;
+import dev.senso.kernel.error.UnauthorizedException;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
@@ -71,9 +72,25 @@ class AuthenticationServiceTest {
 
         // Assert
         assertNotNull(result);
+        assertEquals("access-token", result.accessToken());
+        assertEquals("refresh-token", result.refreshToken());
 
         verify(jwtService).createAccessToken(user);
         verify(refreshTokenService).create(user.getId(), "Chrome");
+    }
+
+    @Test
+    void shouldNormalizeEmailWhenLoggingIn() {
+        // Arrange
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+
+        when(passwordService.matches("Password123!", "hashedPassword")).thenReturn(true);
+
+        // Act
+        authenticationService.login(" TEST@EXAMPLE.COM ", "Password123!", "Chrome");
+
+        // Assert
+        verify(userRepository).findByEmail("test@example.com");
     }
 
     @Test
@@ -82,8 +99,8 @@ class AuthenticationServiceTest {
         when(userRepository.findByEmail("wrong@example.com")).thenReturn(Optional.empty());
 
         // Act + Assert
-        IllegalStateException exception = assertThrows(
-                IllegalStateException.class,
+        UnauthorizedException exception = assertThrows(
+                UnauthorizedException.class,
                 () -> authenticationService.login("wrong@example.com", "Password123!", "Chrome"));
 
         assertEquals("Invalid credentials", exception.getMessage());
@@ -99,8 +116,8 @@ class AuthenticationServiceTest {
         when(passwordService.matches("WrongPassword", "hashedPassword")).thenReturn(false);
 
         // Act + Assert
-        IllegalStateException exception = assertThrows(
-                IllegalStateException.class,
+        UnauthorizedException exception = assertThrows(
+                UnauthorizedException.class,
                 () -> authenticationService.login("test@example.com", "WrongPassword", "Chrome"));
 
         assertEquals("Invalid credentials", exception.getMessage());
@@ -128,11 +145,11 @@ class AuthenticationServiceTest {
         when(passwordService.matches("Password123!", "hashedPassword")).thenReturn(true);
 
         // Act + Assert
-        IllegalStateException exception = assertThrows(
-                IllegalStateException.class,
+        UnauthorizedException exception = assertThrows(
+                UnauthorizedException.class,
                 () -> authenticationService.login("inactive@example.com", "Password123!", "Chrome"));
 
-        assertEquals("User is not active", exception.getMessage());
+        assertEquals("Invalid credentials", exception.getMessage());
 
         verifyNoInteractions(jwtService, refreshTokenService);
     }

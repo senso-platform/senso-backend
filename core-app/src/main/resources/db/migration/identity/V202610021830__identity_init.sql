@@ -1,10 +1,9 @@
 
 CREATE SCHEMA IF NOT EXISTS identity;
-CREATE EXTENSION IF NOT EXISTS citext;
 
 CREATE TABLE identity.users (
                                 id            uuid PRIMARY KEY,
-                                email         citext       NOT NULL UNIQUE,
+                                email varchar(254) NOT NULL UNIQUE,
                                 display_name  varchar(128) NOT NULL,
                                 password_hash varchar(255) NOT NULL,
                                 status        varchar(16)  NOT NULL DEFAULT 'ACTIVE',
