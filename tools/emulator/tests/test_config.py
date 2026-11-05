@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from senso_emulator.config import ConfigError, load_config, parse_args
+from senso_emulator.invalid_messages import INVALID_MESSAGE_VARIANTS
 
 
 def test_loads_local_defaults_and_password_from_environment() -> None:
@@ -102,6 +103,25 @@ def test_discover_loads_initial_device_count() -> None:
 
     assert args.scenario == "discover"
     assert config.device_count == 4
+
+
+@pytest.mark.parametrize("variant", sorted(INVALID_MESSAGE_VARIANTS))
+def test_malformed_requires_and_accepts_supported_variant(variant: str) -> None:
+    args = parse_args(["malformed", "--variant", variant, "--gateway-id", "gw-invalid-01"])
+
+    config = load_config(args, {"SENSO_EMULATOR_PASSWORD": "secret-value"})
+
+    assert args.scenario == "malformed"
+    assert args.variant == variant
+    assert config.gateway_id == "gw-invalid-01"
+
+
+@pytest.mark.parametrize("arguments", [[], ["--variant", "unknown"]])
+def test_malformed_rejects_missing_or_unknown_variant(arguments: list[str]) -> None:
+    with pytest.raises(SystemExit) as error:
+        parse_args(["malformed", *arguments])
+
+    assert error.value.code == 2
 
 
 def test_offline_rejects_password_cli_option_without_echoing_secret() -> None:

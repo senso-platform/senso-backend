@@ -8,6 +8,8 @@ import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
+from senso_emulator.invalid_messages import INVALID_MESSAGE_VARIANTS
+
 GATEWAY_ID_PATTERN = re.compile(r"^[a-z0-9-]{3,64}$")
 
 
@@ -95,6 +97,15 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
     duplicate = subparsers.add_parser("duplicate", help="publish one logical event twice")
     _add_connection_arguments(duplicate)
+
+    malformed = subparsers.add_parser("malformed", help="publish one intentionally invalid message")
+    _add_connection_arguments(malformed)
+    malformed.add_argument(
+        "--variant",
+        required=True,
+        choices=sorted(INVALID_MESSAGE_VARIANTS),
+        help="invalid message variant",
+    )
     return parser.parse_args(arguments)
 
 
