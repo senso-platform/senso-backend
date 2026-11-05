@@ -33,6 +33,11 @@ mosquitto_pub -h localhost -p 1883 -q 1 -u gw-emulator-01 -P emulator-dev-pass \
 аргументов внешних программ, и `{"hello":"world"}` доходит как `{hello:world}` (13 байт, `MALFORMED_JSON`).
 Сообщения шлём из файлов (`-f`), монтируя каталоги примеров в контейнер.
 
+Клиент запускается **в сети compose** (`--network senso_default`, хост `rabbitmq`), как и эмулятор. Путь через
+`host.docker.internal:1883` ненадёжен: на одной из машин команды его перехватывал посторонний MQTT-брокер, который
+принимал любой логин, отвечал PUBACK и выбрасывал сообщения. Проверка: с неверным паролем через `rabbitmq` будет
+`CONNACK (4)` (отказ), а через перехваченный `host.docker.internal` — `CONNACK (0)`.
+
 ### Ручная проверка ingest
 
 Нужны `rabbitmq` из compose и запущенный `ingest` (профиль `local`). Команды — из корня репозитория.
@@ -41,8 +46,9 @@ PowerShell:
 
 ```powershell
 function pub($channel, $file) {
-  docker run --rm -v "${PWD}/contracts/mqtt/examples:/ex:ro" -v "${PWD}/deploy/mqtt-samples:/samples:ro" `
-    eclipse-mosquitto:2 mosquitto_pub -h host.docker.internal -p 1883 -q 1 `
+  docker run --rm --network senso_default `
+    -v "${PWD}/contracts/mqtt/examples:/ex:ro" -v "${PWD}/deploy/mqtt-samples:/samples:ro" `
+    eclipse-mosquitto:2 mosquitto_pub -h rabbitmq -p 1883 -q 1 `
     -u gw-emulator-01 -P emulator-dev-pass -i gw-emulator-01 -t "senso/v1/gw/gw-emulator-01/$channel" -f $file
 }
 pub telemetry /ex/valid/telemetry.json
@@ -52,14 +58,17 @@ bash / Git Bash (`MSYS_NO_PATHCONV=1` нужен только в Git Bash):
 
 ```bash
 pub() {
-  MSYS_NO_PATHCONV=1 docker run --rm -v "$PWD/contracts/mqtt/examples:/ex:ro" -v "$PWD/deploy/mqtt-samples:/samples:ro" \
-    eclipse-mosquitto:2 mosquitto_pub -h host.docker.internal -p 1883 -q 1 \
+  MSYS_NO_PATHCONV=1 docker run --rm --network senso_default \
+    -v "$PWD/contracts/mqtt/examples:/ex:ro" -v "$PWD/deploy/mqtt-samples:/samples:ro" \
+    eclipse-mosquitto:2 mosquitto_pub -h rabbitmq -p 1883 -q 1 \
     -u gw-emulator-01 -P emulator-dev-pass -i gw-emulator-01 -t "senso/v1/gw/gw-emulator-01/$1" -f "$2"
 }
 pub telemetry /ex/valid/telemetry.json
 ```
 
-Пока в `core` нет потребителей, валидным сообщениям некуда идти: они уходят в `q.dlq.failed` после 4 попыток.
+Телеметрию забирает `core` (`q.telemetry.writer`, роль `worker` или `local`); у `status` и `events` получателей
+пока нет — такие сообщения уходят в `q.dlq.failed` после 4 попыток. Записанную телеметрию видно через debug-эндпоинт
+`core` в профиле `local`: `curl http://localhost:8080/api/v1/debug/devices/gw-emulator-01/sensor-fridge-01/latest`.
 Чтобы увидеть их в `senso.validated`, на время проверки создай приёмник: RabbitMQ UI → Queues → Add queue
 `q.check.validated` (type quorum, durable) → Bindings: from exchange `senso.validated`, routing key `#`.
 После проверки удали очередь.
@@ -92,7 +101,7 @@ pub telemetry /ex/valid/telemetry.json
 Сообщение 300 КБ (одинаково в PowerShell и bash):
 
 ```bash
-docker run --rm eclipse-mosquitto:2 sh -c "head -c 300000 /dev/zero | tr '\0' a | mosquitto_pub -h host.docker.internal -p 1883 -q 1 -u gw-emulator-01 -P emulator-dev-pass -i gw-emulator-01 -t senso/v1/gw/gw-emulator-01/telemetry -s"
+docker run --rm --network senso_default eclipse-mosquitto:2 sh -c "head -c 300000 /dev/zero | tr '\0' a | mosquitto_pub -h rabbitmq -p 1883 -q 1 -u gw-emulator-01 -P emulator-dev-pass -i gw-emulator-01 -t senso/v1/gw/gw-emulator-01/telemetry -s"
 ```
 
 `ROUTING_KEY` и `SIGNATURE_INVALID` через MQTT не получить: кривой топик не проходит ACL и binding

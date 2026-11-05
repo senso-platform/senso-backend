@@ -38,6 +38,19 @@ spring:
     username: ${SENSO_RABBIT_USER}
     password: ${SENSO_RABBIT_PASSWORD}
     virtual-host: senso
+    listener:
+      simple:
+        # Ошибка обработки → 3 повтора с паузой 0.5 → 1 → 2 с, затем reject без requeue → DLX senso.dlq / failed →
+        # q.dlq.failed (AGENTS.md §6). Requeue не используем: в RabbitMQ 4.x он не учитывается x-delivery-limit,
+        # и сообщение крутилось бы бесконечно (docs/dev/TROUBLESHOOTING.md, раздел RabbitMQ).
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          stateless: true
+          max-retries: 3
+          initial-interval: 500ms
+          multiplier: 2
+          max-interval: 5s
 
   modulith:
     events:

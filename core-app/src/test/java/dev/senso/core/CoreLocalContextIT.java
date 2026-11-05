@@ -6,10 +6,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.web.client.RestClient;
 
 /** Профиль local = api + worker в одном процессе: бины обеих ролей уживаются, Modulith-эндпоинт открыт. */
+// Контекст с AMQP-листенерами не держим в кэше: иначе он забирает сообщения из очередей других IT.
+@DirtiesContext
 @ActiveProfiles("local")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class CoreLocalContextIT extends IntegrationTestBase {

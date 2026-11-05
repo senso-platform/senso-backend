@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.ApplicationContext;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.web.client.RestClient;
 
@@ -16,6 +17,8 @@ import org.springframework.web.client.RestClient;
  * Роль worker поднимается отдельно от api. Ловит бин, который нужен worker-у, но объявлен только под
  * {@code @ApiRole} (или наоборот) — такое иначе всплывает только на стенде.
  */
+// Контекст с AMQP-листенерами не держим в кэше: иначе он забирает сообщения из очередей других IT.
+@DirtiesContext
 @ActiveProfiles("worker")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "spring.flyway.enabled=true")
 class CoreWorkerContextIT extends IntegrationTestBase {
