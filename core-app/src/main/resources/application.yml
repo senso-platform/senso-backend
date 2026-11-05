@@ -66,5 +66,5 @@ management:
 # Закрытый ключ нельзя хранить в Git.
 senso:
   jwt:
-    public-key: ${JWT_PUBLIC_KEY:}
-    private-key: ${JWT_PRIVATE_KEY:}
+    public-key: ${SENSO_JWT_PUBLIC_KEY:}
+    private-key: ${SENSO_JWT_PRIVATE_KEY:}

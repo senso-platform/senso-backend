@@ -148,7 +148,7 @@ class JwtServiceTest {
 
             String privateKeyPem = toPem("PRIVATE KEY", keyPair.getPrivate().getEncoded());
 
-            JwtProperties properties = new JwtProperties(publicKeyPem, privateKeyPem);
+            JwtProperties properties = new JwtProperties(publicKeyPem, privateKeyPem, false);
 
             return new JwtKeyProvider(properties);
 

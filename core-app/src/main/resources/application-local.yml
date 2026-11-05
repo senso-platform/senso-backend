@@ -24,3 +24,7 @@ management:
     web:
       exposure:
         include: health,info,prometheus,modulith
+senso:
+  jwt:
+    # Без SENSO_JWT_PUBLIC_KEY/SENSO_JWT_PRIVATE_KEY генерируется временная пара: токены не переживают рестарт.
+    generate-if-missing: true
