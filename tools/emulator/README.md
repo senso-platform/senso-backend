@@ -3,7 +3,7 @@
 Утилита на Python 3.12 эмулирует один IoT-шлюз и публикует MQTT-сообщения,
 соответствующие JSON Schema из `../../contracts/mqtt`. Для MQTT-транспорта используется
 Paho MQTT, а для UUID v7 — пакет `uuid6`. Реализованы ограниченные сценарии
-`normal`, `offline`, `anomaly`, `discover` и `duplicate`.
+`normal`, `offline`, `anomaly`, `discover`, `duplicate` и `malformed`.
 
 Эмулятор работает по MQTT 3.1.1 и дожидается PUBACK после каждой публикации с QoS 1.
 Статусы `GATEWAY_STATUS` публикуются в retained-режиме в топик
@@ -137,7 +137,8 @@ docker compose -f deploy/docker-compose.yml --profile emulator build emulator
 либо пуста, обычные команды Compose без профиля продолжают работать, но контейнер эмулятора
 отклоняет запуск с кодом `2`.
 
-После готовности RabbitMQ все пять сценариев можно запускать отдельными одноразовыми контейнерами:
+После готовности RabbitMQ все реализованные сценарии можно запускать отдельными одноразовыми
+контейнерами:
 
 ```powershell
 docker compose -f deploy/docker-compose.yml --profile emulator run --rm --no-deps emulator normal --once
@@ -145,6 +146,7 @@ docker compose -f deploy/docker-compose.yml --profile emulator run --rm --no-dep
 docker compose -f deploy/docker-compose.yml --profile emulator run --rm --no-deps emulator anomaly
 docker compose -f deploy/docker-compose.yml --profile emulator run --rm --no-deps emulator discover
 docker compose -f deploy/docker-compose.yml --profile emulator run --rm --no-deps emulator duplicate
+docker compose -f deploy/docker-compose.yml --profile emulator run --rm --no-deps emulator malformed --variant broken-json
 ```
 
 `--no-deps` следует использовать только после успешного `up -d --wait rabbitmq`. Без него Compose
@@ -234,7 +236,66 @@ $env:SENSO_EMULATOR_PASSWORD = 'emulator-dev-pass'
 python -m senso_emulator duplicate
 ```
 
-Сценарии `anomaly`, `discover` и `duplicate` завершаются с кодом `0` после штатной сессии,
+## Запуск `malformed`
+
+Сценарий `malformed` публикует одно намеренно некорректное сообщение для негативной проверки
+приёмного контура. Он не ослабляет обычные builders: сначала создаётся валидная `TELEMETRY`,
+после чего локальный builder сценария применяет выбранное контролируемое нарушение.
+
+Последовательность MQTT-сессии:
+
+1. retained `GATEWAY_STATUS: ONLINE` и ожидание PUBACK;
+2. одно некорректное сообщение без retain в топик `senso/v1/gw/{gatewayId}/telemetry` и ожидание
+   PUBACK;
+3. retained `GATEWAY_STATUS: OFFLINE` и ожидание PUBACK;
+4. MQTT DISCONNECT.
+
+Аргумент `--variant` обязателен и принимает семь значений:
+
+| Вариант | Намеренное нарушение |
+| --- | --- |
+| `broken-json` | У валидного JSON удалена завершающая фигурная скобка |
+| `missing-message-id` | В envelope отсутствует обязательное поле `messageId` |
+| `wrong-type` | Поле `type` содержит не предусмотренное контрактом значение `DEVICE_PING` |
+| `too-many-samples` | `TELEMETRY` содержит 501 sample при максимуме 500 |
+| `future-timestamp` | `sentAt` установлен на 10 минут позже актуального UTC-времени при допустимом отклонении +5 минут |
+| `gateway-mismatch` | `gatewayId` внутри envelope не совпадает с gateway в MQTT topic |
+| `oversized` | Schema-valid payload больше лимита ingest 262144 байта, но меньше лимита RabbitMQ 524288 байт |
+
+Примеры локального запуска из `tools/emulator`:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+$env:SENSO_EMULATOR_PASSWORD = 'emulator-dev-pass'
+
+python -m senso_emulator malformed --variant broken-json
+python -m senso_emulator malformed --variant missing-message-id
+python -m senso_emulator malformed --variant wrong-type
+python -m senso_emulator malformed --variant too-many-samples
+python -m senso_emulator malformed --variant future-timestamp
+python -m senso_emulator malformed --variant gateway-mismatch
+python -m senso_emulator malformed --variant oversized
+```
+
+Контейнерный запуск из корня репозитория использует тот же CLI:
+
+```powershell
+docker compose -f deploy/docker-compose.yml --profile emulator run --rm --no-deps `
+  emulator malformed --variant broken-json
+
+docker compose -f deploy/docker-compose.yml --profile emulator run --rm --no-deps `
+  emulator malformed --variant missing-message-id
+```
+
+`--no-deps` допустим только после отдельного успешного запуска RabbitMQ. Без него Compose запустит
+зависимый брокер и дождётся его healthcheck.
+
+Успешный PUBACK означает, что RabbitMQ принял MQTT-публикацию. Он не подтверждает, что
+`ingest-app` прочитал сообщение, проверил его или направил в `q.dlq.invalid`. Фактическое решение
+backend можно подтвердить только отдельной интеграционной проверкой с работающим `ingest-app` и
+наблюдением результата по уникальным данным тестового запуска.
+
+Сценарии `anomaly`, `discover`, `duplicate` и `malformed` завершаются с кодом `0` после штатной сессии,
 с кодом `2` при ошибке конфигурации и с кодом `3` при ошибке MQTT. Как и в остальных
 сценариях, пароль берётся только из `SENSO_EMULATOR_PASSWORD`.
 
@@ -283,8 +344,8 @@ python -m pytest -m integration
 ## Текущие ограничения
 
 - Эмулятор работает с одним шлюзом и реализует ограниченные сценарии `normal`, `offline`,
-  `anomaly`, `discover` и `duplicate`.
-- Сценарии `malformed`, `out-of-order` и `flood` пока не реализованы.
+  `anomaly`, `discover`, `duplicate` и `malformed`.
+- Сценарии `out-of-order` и `flood` пока не реализованы.
 - Используется MQTT 3.1.1 без TLS, что соответствует локальной Compose-конфигурации.
 - JSON Schema не включаются в Python-пакет и не копируются: тестам требуется репозиторий
   с рабочей копией сабмодуля `contracts`.
@@ -292,4 +353,5 @@ python -m pytest -m integration
 - Текущая схема `bootId` требует только строку длиной от 8 до 64 символов, соответствующую
   `[A-Za-z0-9_-]+`. Реализация использует новый UUID v4 в качестве `bootId`, но контракт не требует
   для него UUID v7.
-- Обработка в backend ingest не входит в текущий этап; доставка завершается в `q.ingest.raw`.
+- Unit-тесты `malformed` проверяют генерацию, MQTT-последовательность и моделируемые PUBACK, но не
+  фактическое отклонение сообщения работающим `ingest-app` и не доставку в `q.dlq.invalid`.

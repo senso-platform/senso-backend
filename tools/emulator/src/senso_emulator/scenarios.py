@@ -11,6 +11,7 @@ from uuid import uuid4
 from uuid6 import uuid7
 
 from senso_emulator.config import EmulatorConfig
+from senso_emulator.invalid_messages import build_invalid_message
 from senso_emulator.messages import (
     OutboundMessage,
     build_device_discovered,
@@ -81,6 +82,18 @@ class DuplicateResult:
     @property
     def messages(self) -> tuple[OutboundMessage, ...]:
         return (self.online, self.duplicate, self.duplicate, self.offline)
+
+
+@dataclass(frozen=True)
+class MalformedResult:
+    boot_id: str
+    online: OutboundMessage
+    malformed: OutboundMessage
+    offline: OutboundMessage
+
+    @property
+    def messages(self) -> tuple[OutboundMessage, ...]:
+        return (self.online, self.malformed, self.offline)
 
 
 @dataclass(frozen=True)
@@ -261,6 +274,40 @@ def run_duplicate(
     )
 
 
+def run_malformed(
+    config: EmulatorConfig,
+    variant: str,
+    *,
+    transport_factory: Callable[[EmulatorConfig, OutboundMessage], MqttTransport] | None = None,
+    clock: Callable[[], datetime] | None = None,
+) -> MalformedResult:
+    clock = clock or _now
+
+    def build_body(boot_id: str, sequence: int) -> _ScenarioBody:
+        malformed = build_invalid_message(
+            variant,
+            gateway_id=config.gateway_id,
+            boot_id=boot_id,
+            message_id=uuid7(),
+            sent_at=clock(),
+            seq=sequence,
+        )
+        return _ScenarioBody((malformed,), sequence + 1)
+
+    session = _run_graceful_session(
+        config,
+        build_body,
+        transport_factory=transport_factory,
+        clock=clock,
+    )
+    return MalformedResult(
+        boot_id=session.boot_id,
+        online=session.online,
+        malformed=session.body[0],
+        offline=session.offline,
+    )
+
+
 def run_normal(
     config: EmulatorConfig,
     *,
@@ -433,8 +480,8 @@ def _run_graceful_session(
 
 
 def _publish(transport: MqttTransport, message: OutboundMessage) -> None:
-    message_id = message.document["messageId"]
-    message_type = message.document["type"]
+    message_id = message.document.get("messageId", "<absent>")
+    message_type = message.document.get("type", "<unknown>")
     mid = transport.publish(message)
     LOGGER.info("PUBACK received (type=%s, messageId=%s, mid=%s)", message_type, message_id, mid)
 

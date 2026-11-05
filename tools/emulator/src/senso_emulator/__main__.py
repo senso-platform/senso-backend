@@ -10,6 +10,7 @@ from senso_emulator.scenarios import (
     run_anomaly,
     run_discover,
     run_duplicate,
+    run_malformed,
     run_normal,
     run_offline,
 )
@@ -34,6 +35,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         if args.scenario == "duplicate":
             run_duplicate(config)
+            return 0
+        if args.scenario == "malformed":
+            run_malformed(config, args.variant)
             return 0
         raise ConfigError("unsupported scenario")
     except ConfigError as exc:

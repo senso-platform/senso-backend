@@ -8,12 +8,14 @@ import pytest
 from jsonschema import Draft202012Validator, FormatChecker
 
 from senso_emulator.config import EmulatorConfig
+from senso_emulator.invalid_messages import FUTURE_TIMESTAMP_OFFSET, INVALID_MESSAGE_VARIANTS
 from senso_emulator.messages import OutboundMessage
 from senso_emulator.mqtt_transport import MqttTransportError
 from senso_emulator.scenarios import (
     run_anomaly,
     run_discover,
     run_duplicate,
+    run_malformed,
     run_normal,
     run_offline,
 )
@@ -25,6 +27,7 @@ class FakeTransport:
     fail_gateway_state: ClassVar[str | None] = None
     lose_after_message_type: ClassVar[str | None] = None
     abort_error: ClassVar[MqttTransportError | None] = None
+    fail_publish_number: ClassVar[int | None] = None
 
     def __init__(self, config: EmulatorConfig, last_will: OutboundMessage) -> None:
         self.config = config
@@ -44,8 +47,10 @@ class FakeTransport:
         self.calls.append(("publish", message_type))
         self.messages.append(message)
         gateway_state = message.document["payload"].get("state")
-        if message_type == type(self).fail_message_type or (
-            message_type == "GATEWAY_STATUS" and gateway_state == type(self).fail_gateway_state
+        if (
+            len(self.messages) == type(self).fail_publish_number
+            or (message_type == type(self).fail_message_type)
+            or (message_type == "GATEWAY_STATUS" and gateway_state == type(self).fail_gateway_state)
         ):
             raise MqttTransportError("MQTT publish confirmation failed")
         if message_type == type(self).lose_after_message_type:
@@ -67,6 +72,7 @@ def reset_fake_transport() -> None:
     FakeTransport.fail_gateway_state = None
     FakeTransport.lose_after_message_type = None
     FakeTransport.abort_error = None
+    FakeTransport.fail_publish_number = None
 
 
 @pytest.fixture
@@ -272,6 +278,113 @@ def test_duplicate_republishes_same_object_and_serialized_bytes(
     assert result.messages == tuple(transport.messages)
     assert [message.document["seq"] for message in result.messages] == [0, 1, 1, 2]
     assert all(message.document["bootId"] == result.boot_id for message in result.messages)
+
+
+@pytest.mark.parametrize("variant", sorted(INVALID_MESSAGE_VARIANTS))
+def test_malformed_publishes_one_invalid_message_in_graceful_session(
+    once_config: EmulatorConfig,
+    variant: str,
+) -> None:
+    result = run_malformed(
+        once_config,
+        variant,
+        transport_factory=FakeTransport,
+        clock=_fixed_clock,
+    )
+    transport = FakeTransport.instances[-1]
+    malformed_type = "DEVICE_PING" if variant == "wrong-type" else "TELEMETRY"
+
+    assert transport.calls == [
+        ("connect", None),
+        ("publish", "GATEWAY_STATUS"),
+        ("publish", malformed_type),
+        ("publish", "GATEWAY_STATUS"),
+        ("disconnect", None),
+    ]
+    assert result.messages == tuple(transport.messages)
+    assert [message.document["seq"] for message in result.messages] == [0, 1, 2]
+    assert all(message.document["bootId"] == result.boot_id for message in result.messages)
+    assert result.online.document["payload"]["state"] == "ONLINE"
+    assert result.offline.document["payload"]["state"] == "OFFLINE"
+    assert result.online.retain is result.offline.retain is True
+    assert result.malformed.qos == 1
+    assert result.malformed.retain is False
+
+
+def test_malformed_logs_puback_safely_without_message_id(
+    once_config: EmulatorConfig,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level("INFO", logger="senso_emulator.scenarios")
+
+    run_malformed(
+        once_config,
+        "missing-message-id",
+        transport_factory=FakeTransport,
+        clock=_fixed_clock,
+    )
+
+    assert "messageId=<absent>" in caplog.text
+    assert caplog.text.count("PUBACK received") == 3
+    assert "secret-value" not in caplog.text
+
+
+def test_malformed_future_timestamp_uses_clock_at_body_generation(
+    once_config: EmulatorConfig,
+) -> None:
+    moments = iter(datetime(2026, 10, 21, 12, minute, tzinfo=UTC) for minute in range(4))
+
+    result = run_malformed(
+        once_config,
+        "future-timestamp",
+        transport_factory=FakeTransport,
+        clock=lambda: next(moments),
+    )
+
+    generated_at = datetime(2026, 10, 21, 12, 2, tzinfo=UTC)
+    expected = generated_at + FUTURE_TIMESTAMP_OFFSET
+    assert result.malformed.document["sentAt"] == expected.isoformat(
+        timespec="milliseconds"
+    ).replace("+00:00", "Z")
+
+
+@pytest.mark.parametrize("variant", sorted(INVALID_MESSAGE_VARIANTS))
+def test_malformed_aborts_without_disconnect_when_body_is_not_acknowledged(
+    once_config: EmulatorConfig,
+    variant: str,
+) -> None:
+    FakeTransport.fail_publish_number = 2
+
+    with pytest.raises(MqttTransportError, match="confirmation"):
+        run_malformed(
+            once_config,
+            variant,
+            transport_factory=FakeTransport,
+            clock=_fixed_clock,
+        )
+
+    transport = FakeTransport.instances[-1]
+    assert transport.calls[-1] == ("abort", None)
+    assert ("disconnect", None) not in transport.calls
+    assert len(transport.messages) == 2
+
+
+def test_malformed_aborts_if_offline_is_not_acknowledged(
+    once_config: EmulatorConfig,
+) -> None:
+    FakeTransport.fail_gateway_state = "OFFLINE"
+
+    with pytest.raises(MqttTransportError, match="confirmation"):
+        run_malformed(
+            once_config,
+            "broken-json",
+            transport_factory=FakeTransport,
+            clock=_fixed_clock,
+        )
+
+    transport = FakeTransport.instances[-1]
+    assert transport.calls[-1] == ("abort", None)
+    assert ("disconnect", None) not in transport.calls
 
 
 @pytest.mark.parametrize("runner", [run_anomaly, run_discover, run_duplicate])

@@ -40,6 +40,18 @@ def test_new_scenario_cli_success_exit_code(
     assert main([scenario]) == 0
 
 
+def test_malformed_cli_passes_variant_and_returns_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    received: list[tuple[object, str]] = []
+    monkeypatch.setenv("SENSO_EMULATOR_PASSWORD", "secret-value")
+    monkeypatch.setattr(
+        "senso_emulator.__main__.run_malformed",
+        lambda config, variant: received.append((config, variant)),
+    )
+
+    assert main(["malformed", "--variant", "broken-json"]) == 0
+    assert received[0][1] == "broken-json"
+
+
 def test_cli_configuration_error_exit_code(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "senso_emulator.__main__.load_config",
@@ -89,3 +101,13 @@ def test_new_scenario_transport_error_exit_code(
     )
 
     assert main([scenario]) == 3
+
+
+def test_malformed_cli_transport_error_exit_code(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SENSO_EMULATOR_PASSWORD", "secret-value")
+    monkeypatch.setattr(
+        "senso_emulator.__main__.run_malformed",
+        lambda config, variant: (_ for _ in ()).throw(MqttTransportError("network failure")),
+    )
+
+    assert main(["malformed", "--variant", "broken-json"]) == 3
